@@ -60,7 +60,7 @@ h1 {
   text-wrap: balance;
 }
 #modes { display: flex; gap: 6px; flex-wrap: wrap; }
-#modes button, #voice, #mic {
+#modes button, #voice, #mic, #storybar button {
   font: inherit;
   font-family: var(--display);
   font-weight: 500;
@@ -72,7 +72,10 @@ h1 {
   color: var(--ink);
   cursor: pointer;
 }
-#modes button[aria-pressed="true"], #voice[aria-pressed="true"], #mic[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+#modes button[aria-pressed="true"], #voice[aria-pressed="true"], #mic[aria-pressed="true"], #storybar button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--paper);
+}
 #voice:disabled, #mic:disabled { opacity: 0.5; cursor: default; }
 .namebox { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
 .namebox input {
@@ -101,6 +104,14 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   text-wrap: balance;
 }
 
+#storybar {
+  display: none;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+[data-mode="histoire"] #storybar { display: flex; }
+
 #micbox {
   display: flex;
   flex-wrap: wrap;
@@ -122,6 +133,10 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
 #sens { width: 120px; accent-color: var(--ink); }
 
 #stage {
+  --sky-a: var(--sky-top);
+  --sky-b: var(--sky-bottom);
+  --ground-c: var(--ground);
+  --rise: 0;
   position: relative;
   flex: 1;
   min-height: 260px;
@@ -129,9 +144,13 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   border-radius: 28px;
   border: 3px solid var(--ink);
   background:
-    linear-gradient(to top, var(--ground) 0 8%, transparent 8%),
-    linear-gradient(to bottom, var(--sky-top), var(--sky-bottom));
+    linear-gradient(to top, var(--ground-c) 0 8%, transparent 8%),
+    linear-gradient(to bottom, var(--sky-a), var(--sky-b));
 }
+#stage[data-scene="night"] { --sky-a: #14204a; --sky-b: #3a4f8f; --ground-c: #2f6b4a; }
+#stage[data-scene="morning"] { --sky-a: #ff9f7a; --sky-b: #ffe9b8; --ground-c: #8ed081; }
+#stage[data-scene="party"] { --sky-a: #7a4fd0; --sky-b: #ffb3d9; --ground-c: #7bc47f; }
+
 .cloud {
   position: absolute;
   height: 34px;
@@ -149,9 +168,46 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   border-radius: 999px;
   background: var(--paper);
 }
+#stage[data-scene="night"] .cloud { opacity: 0.22; }
+
+#stars, #flags, #orb { display: none; position: absolute; pointer-events: none; }
+#stage[data-scene="night"] #stars { display: block; inset: 0; }
+#stage[data-scene="party"] #flags { display: flex; left: 3%; right: 3%; top: 3%; justify-content: space-between; }
+#stage[data-scene="night"] #orb, #stage[data-scene="morning"] #orb, #stage[data-scene="party"] #orb { display: block; }
+.star {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+.star.on { opacity: 0.95; }
+.flag {
+  width: clamp(14px, 3vw, 30px);
+  aspect-ratio: 0.85;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  opacity: 0.12;
+  transition: opacity 0.4s;
+}
+.flag.on { opacity: 1; }
+#orb {
+  left: 80%;
+  bottom: calc(8% + var(--rise) * 52%);
+  width: clamp(46px, 8vw, 78px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 3px solid var(--ink);
+  transform: translateX(-50%);
+  transition: bottom 0.9s ease-out;
+}
+#stage[data-scene="night"] #orb { background: #fff6c9; box-shadow: 0 0 28px 8px rgba(255, 246, 201, 0.5); }
+#stage[data-scene="morning"] #orb { background: #ffb02e; box-shadow: 0 0 30px 10px rgba(255, 176, 46, 0.45); }
+#stage[data-scene="party"] #orb { background: #ffd23f; box-shadow: 0 0 30px 10px rgba(255, 210, 63, 0.5); }
 
 #steps { position: absolute; inset: 0; pointer-events: none; transition: opacity 0.3s, transform 0.3s; }
-[data-mode="libre"] #steps, [data-mode="tenir"] #steps { opacity: 0; transform: translateY(14%); }
+[data-mode="libre"] #steps, [data-mode="histoire"] #steps { opacity: 0; transform: translateY(14%); }
 .step {
   position: absolute;
   bottom: 8%;
@@ -168,7 +224,23 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   font-size: clamp(0.9rem, 2.2vw, 1.4rem);
 }
 .step.target { animation: glow 0.9s ease-in-out infinite alternate; }
-@keyframes glow { from { box-shadow: 0 0 0 0 rgba(30, 42, 68, 0.0); } to { box-shadow: 0 0 0 8px rgba(30, 42, 68, 0.28); } }
+@keyframes glow { from { box-shadow: 0 0 0 0 rgba(30, 42, 68, 0); } to { box-shadow: 0 0 0 8px rgba(30, 42, 68, 0.28); } }
+
+#stones { display: none; position: absolute; inset: 0; pointer-events: none; }
+[data-mode="histoire"] #stones { display: block; }
+.stone {
+  position: absolute;
+  bottom: 2.2%;
+  width: clamp(12px, 2.1vw, 22px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 3px solid var(--ink);
+  transform: translateX(-50%);
+  opacity: 0.4;
+}
+.stone.done { opacity: 1; }
+.stone.next { opacity: 1; animation: pulse 0.8s ease-in-out infinite alternate; }
+@keyframes pulse { from { transform: translateX(-50%) scale(1); } to { transform: translateX(-50%) scale(1.35); } }
 
 #fox {
   position: absolute;
@@ -178,10 +250,6 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   transition: left 0.45s cubic-bezier(0.3, 1.5, 0.5, 1), bottom 0.45s cubic-bezier(0.3, 1.5, 0.5, 1);
 }
 #fox svg { width: 100%; height: 100%; display: block; overflow: visible; transform-origin: 50% 100%; }
-#fox .mouth-open { display: none; }
-#fox.singing .mouth-open { display: block; }
-#fox.singing .mouth-closed { display: none; }
-#fox.singing svg { animation: sway 0.6s ease-in-out infinite alternate; }
 #fox.hop svg { animation: hop 0.45s ease-out; }
 #fox.wobble svg { animation: wobble 0.5s ease-in-out; }
 @keyframes hop {
@@ -194,34 +262,6 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   0%, 100% { transform: rotate(0); }
   25% { transform: rotate(-7deg); }
   75% { transform: rotate(7deg); }
-}
-@keyframes sway { from { transform: rotate(-3deg); } to { transform: rotate(3deg); } }
-
-#hold {
-  position: absolute;
-  top: 12%;
-  left: 50%;
-  width: min(520px, 80%);
-  transform: translateX(-50%);
-  display: none;
-  text-align: center;
-}
-[data-mode="tenir"] #hold { display: block; }
-#hold .track {
-  height: 26px;
-  border-radius: 999px;
-  border: 3px solid var(--ink);
-  background: var(--paper);
-  overflow: hidden;
-}
-#fill { height: 100%; width: 0; background: var(--c-do); transition: width 0.08s linear; }
-#fill.drain { transition: width 0.45s ease-out; }
-#count {
-  margin-top: 8px;
-  font-family: var(--display);
-  font-weight: 600;
-  font-size: 1.5rem;
-  font-variant-numeric: tabular-nums;
 }
 
 #rainbow {
@@ -264,9 +304,10 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
-  transition: transform 0.06s, box-shadow 0.06s;
+  transition: transform 0.06s, box-shadow 0.06s, opacity 0.2s;
 }
 .key.down { transform: translateY(7px); box-shadow: 0 1px 0 var(--ink); }
+.key.unused { opacity: 0.35; }
 .key.target { animation: keyglow 0.9s ease-in-out infinite alternate; }
 @keyframes keyglow { from { outline: 0 solid rgba(30, 42, 68, 0); } to { outline: 8px solid rgba(30, 42, 68, 0.3); } }
 
@@ -300,7 +341,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     <h1>Renard des notes</h1>
     <div id="modes" role="group" aria-label="Choisir un jeu">
       <button type="button" data-mode="escalier" aria-pressed="true">Escalier</button>
-      <button type="button" data-mode="tenir" aria-pressed="false">Tiens la note</button>
+      <button type="button" data-mode="histoire" aria-pressed="false">Histoires</button>
       <button type="button" data-mode="libre" aria-pressed="false">Jeu libre</button>
     </div>
     <button type="button" id="voice" aria-pressed="true">Voix : oui</button>
@@ -312,20 +353,22 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
 
   <p id="hint" role="status" aria-live="polite"></p>
 
+  <div id="storybar" role="group" aria-label="Choisir une histoire"></div>
+
   <div id="micbox" hidden>
     <span id="mic-note">J'entends : rien</span>
     <progress id="level" max="1" value="0" aria-label="Volume du micro"></progress>
-    <label id="sens-wrap" for="sens">Sensibilité <input id="sens" type="range" min="1" max="10" value="5"></label>
+    <label id="sens-wrap" for="sens">Sensibilité <input id="sens" type="range" min="1" max="10" value="10"></label>
   </div>
 
-  <main id="stage">
+  <main id="stage" data-scene="day">
     <div class="cloud" style="left:6%; top:10%; width:110px"></div>
     <div class="cloud" style="left:70%; top:22%; width:140px"></div>
+    <div id="stars"></div>
+    <div id="flags"></div>
+    <div id="orb"></div>
     <div id="steps"></div>
-    <div id="hold" aria-hidden="true">
-      <div class="track"><div id="fill"></div></div>
-      <div id="count">0 / 8 s</div>
-    </div>
+    <div id="stones"></div>
     <svg id="rainbow" viewBox="0 0 400 220" aria-hidden="true"></svg>
     <div id="fox" aria-hidden="true">
       <svg viewBox="0 0 120 130">
@@ -346,8 +389,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
         <circle cx="46" cy="50" r="1.8" fill="#fff"/>
         <circle cx="78" cy="50" r="1.8" fill="#fff"/>
         <ellipse cx="60" cy="68" rx="5" ry="4" fill="#1e2a44"/>
-        <path class="mouth-closed" d="M52 74 Q60 80 68 74" stroke="#1e2a44" stroke-width="3" fill="none" stroke-linecap="round"/>
-        <ellipse class="mouth-open" cx="60" cy="77" rx="7" ry="6.5" fill="#7a2e10" stroke="#1e2a44" stroke-width="2.5"/>
+        <path d="M52 74 Q60 80 68 74" stroke="#1e2a44" stroke-width="3" fill="none" stroke-linecap="round"/>
       </svg>
     </div>
   </main>
@@ -360,7 +402,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
 (function () {
   'use strict';
 
-  // Les 7 notes existent déjà ; la v1 en affiche 5 (ACTIVE). Le mode chanson viendra avec un fichier de notes.
+  // Les 7 notes existent déjà ; on affiche 5 touches (ACTIVE).
   var NOTES = [
     { name: 'do',  freq: 261.63, color: '#d93a40', text: '#ffffff', word: 'rouge',  key: 'a' },
     { name: 'ré',  freq: 293.66, color: '#f28a30', text: '#1e2a44', word: 'orange', key: 's' },
@@ -371,37 +413,83 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     { name: 'si',  freq: 493.88, color: '#e0559c', text: '#ffffff', word: 'rose',   key: 'j' }
   ];
   var ACTIVE = 5;
-  var HOLD_MS = 8000;
   var STEP_H = 11;   // hauteur d'une marche, en % de la scène
   var GROUND = 8;    // épaisseur du sol, en % de la scène
+
+  /* STORIES-START */
+  // Mélodies du domaine public (chansons traditionnelles et Beethoven), écrites en numéros de notes :
+  // 0 = do, 1 = ré, 2 = mi, 3 = fa, 4 = sol. Les textes des histoires sont originaux.
+  var STORIES = [
+    {
+      id: 'lune', short: 'La lune', scene: 'night',
+      melody: [0, 0, 0, 1, 2, 1, 0, 2, 1, 1, 0,  0, 0, 0, 1, 2, 1, 0, 2, 1, 1, 0],
+      chapters: [
+        { at: 0,  text: '{nom} sort de son terrier. Il fait nuit.' },
+        { at: 6,  text: 'Les étoiles s’allument une à une.' },
+        { at: 11, text: '{nom} traverse le champ. Où est la lune ?' },
+        { at: 17, text: 'Là-haut, elle se montre petit à petit.' }
+      ],
+      end: 'La lune brille ! {nom} est tout content. Bravo !'
+    },
+    {
+      id: 'reveil', short: 'Le réveil', scene: 'morning',
+      melody: [0, 1, 2, 0,  0, 1, 2, 0,  2, 3, 4,  2, 3, 4],
+      chapters: [
+        { at: 0,  text: 'Le jour se lève. {nom} va réveiller ses amis.' },
+        { at: 4,  text: 'Toc toc ! Le hibou ouvre un œil.' },
+        { at: 8,  text: 'Le blaireau s’étire. Debout là-dedans !' },
+        { at: 11, text: 'Le soleil monte, tout le monde se lève.' }
+      ],
+      end: 'Tout le monde est réveillé ! Quelle belle journée !'
+    },
+    {
+      id: 'fete', short: 'La fête', scene: 'party',
+      melody: [2, 2, 3, 4,  4, 3, 2, 1,  0, 0, 1, 2,  1, 0, 0],
+      chapters: [
+        { at: 0,  text: 'Aujourd’hui, c’est la fête dans la forêt !' },
+        { at: 4,  text: '{nom} accroche les guirlandes.' },
+        { at: 8,  text: 'Les amis arrivent en dansant.' },
+        { at: 12, text: 'La musique résonne dans toute la forêt.' }
+      ],
+      end: 'Feu d’artifice ! Quelle belle fête avec {nom} !'
+    }
+  ];
+  /* STORIES-END */
 
   var app = document.getElementById('app');
   var stage = document.getElementById('stage');
   var stepsEl = document.getElementById('steps');
+  var stonesEl = document.getElementById('stones');
+  var starsEl = document.getElementById('stars');
+  var flagsEl = document.getElementById('flags');
   var keysEl = document.getElementById('keys');
   var fxEl = document.getElementById('fx');
   var foxEl = document.getElementById('fox');
   var hintEl = document.getElementById('hint');
-  var fillEl = document.getElementById('fill');
-  var countEl = document.getElementById('count');
   var rainbowEl = document.getElementById('rainbow');
   var nameInput = document.getElementById('fox-name');
+  var storyBar = document.getElementById('storybar');
 
   var mode = 'escalier';
   var foxName = 'Renard';
   var stepIdx = -1;
   var target = 0;
-  var pressed = {};          // index -> { voice, t }
-  var activeHold = null;     // index de la touche tenue
-  var holdStart = 0;
-  var holdDone = false;
-  var rafId = 0;
+  var pressed = {};          // index -> { voice, t, silent }
   var timers = [];
+  var storyIdx = 0;
+  var pos = 0;
+  var storyDone = false;
+  var stoneEls = [];
+  var stoneX = [];
+  var starList = [];
+  var flagList = [];
+  var stars = {};
 
   try {
     var saved = window.localStorage.getItem('renard-nom');
     if (saved) { foxName = saved; nameInput.value = saved; }
-  } catch (e) { /* pas de stockage : on continue */ }
+    stars = JSON.parse(window.localStorage.getItem('renard-etoiles') || '{}') || {};
+  } catch (e) { stars = {}; }
 
   /* ---------- Son ---------- */
   var ac = null;
@@ -472,12 +560,11 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     });
   }
 
-  /* ---------- Voix ---------- */
+  /* ---------- Voix : elle ne dit que le nom de la note ---------- */
   var synth = ('speechSynthesis' in window) ? window.speechSynthesis : null;
   var voiceBtn = document.getElementById('voice');
   var voiceOn = true;
   var userActed = false;   // les navigateurs refusent de parler avant le premier geste
-  var quiet = false;
   var ignoreUntil = 0;     // pause de l'écoute du micro (sons de l'écran, voix)
   var frVoice = null;
 
@@ -504,7 +591,11 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
       if (frVoice) u.voice = frVoice;
       u.rate = 0.9;
       u.pitch = 1.1;
-      ignoreUntil = performance.now() + 900;
+      // Le micro reprend très vite : seulement 250 ms après la fin du mot
+      var done = function () { ignoreUntil = performance.now() + 250; };
+      u.onend = done;
+      u.onerror = done;
+      ignoreUntil = performance.now() + 1200;
       synth.speak(u);
     } catch (e) { /* voix indisponible : le jeu continue sans */ }
   }
@@ -527,7 +618,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     refreshVoiceBtn();
     if (voiceOn) {
       userActed = true;
-      say(hintEl.textContent);
+      say('Voix');
     } else if (synth) {
       try { synth.cancel(); } catch (e) { /* ignoré */ }
     }
@@ -572,7 +663,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     k.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   });
 
-  (function buildRainbow() {
+  (function buildScenery() {
     var NS = 'http://www.w3.org/2000/svg';
     for (var i = 0; i < ACTIVE; i++) {
       var r = 190 - i * 22;
@@ -582,16 +673,28 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
       p.setAttribute('stroke', NOTES[i].color);
       rainbowEl.appendChild(p);
     }
+    for (var s = 0; s < 18; s++) {
+      var st = document.createElement('div');
+      st.className = 'star';
+      st.style.left = ((s * 37) % 88 + 6) + '%';
+      st.style.top = ((s * 53) % 52 + 5) + '%';
+      starsEl.appendChild(st);
+      starList.push(st);
+    }
+    for (var f = 0; f < 12; f++) {
+      var fl = document.createElement('div');
+      fl.className = 'flag';
+      fl.style.background = NOTES[f % ACTIVE].color;
+      flagsEl.appendChild(fl);
+      flagList.push(fl);
+    }
   })();
 
   /* ---------- Utilitaires ---------- */
   function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
   function clearTimers() { timers.forEach(clearTimeout); timers = []; }
 
-  function setHint(text) {
-    hintEl.textContent = text;
-    if (!quiet) say(text);
-  }
+  function setHint(text) { hintEl.textContent = text; }
 
   function foxTo(leftPct, bottomPct) {
     foxEl.style.left = leftPct + '%';
@@ -608,6 +711,8 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     if (mode === 'escalier') {
       if (stepIdx < 0) foxTo(8, GROUND);
       else foxTo(4 + (stepIdx + 0.5) * (92 / ACTIVE), GROUND + (stepIdx + 1) * STEP_H);
+    } else if (mode === 'histoire') {
+      foxTo(pos === 0 ? 3.5 : stoneX[pos - 1], GROUND);
     } else {
       foxTo(50, GROUND);
     }
@@ -656,9 +761,87 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     later(function () { rainbowEl.classList.remove('show'); }, 3600);
   }
 
+  /* ---------- Histoires ---------- */
+  function storyCaption() {
+    var st = STORIES[storyIdx];
+    var text = storyDone ? st.end : st.chapters[0].text;
+    if (!storyDone) st.chapters.forEach(function (c) { if (c.at <= pos) text = c.text; });
+    return text.replace(/\{nom\}/g, foxName);
+  }
+
+  function updateStory() {
+    var st = STORIES[storyIdx];
+    var p = pos / st.melody.length;
+    stoneEls.forEach(function (d, k) {
+      d.classList.toggle('done', k < pos);
+      d.classList.toggle('next', k === pos && !storyDone);
+    });
+    stage.style.setProperty('--rise', String(p));
+    var ns = Math.round(starList.length * p);
+    starList.forEach(function (s, k) { s.classList.toggle('on', k < ns); });
+    var nf = Math.round(flagList.length * p);
+    flagList.forEach(function (f, k) { f.classList.toggle('on', k < nf); });
+  }
+
+  function saveStar(id) {
+    stars[id] = (stars[id] || 0) + 1;
+    try { window.localStorage.setItem('renard-etoiles', JSON.stringify(stars)); } catch (e) { /* ignoré */ }
+    refreshStoryBar();
+  }
+
+  function refreshStoryBar() {
+    storyBar.innerHTML = '';
+    STORIES.forEach(function (s, k) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('aria-pressed', k === storyIdx ? 'true' : 'false');
+      b.textContent = 'Niveau ' + (k + 1) + ' : ' + s.short + (stars[s.id] ? ' ★' : '');
+      b.addEventListener('click', function () {
+        if (k === storyIdx && pos === 0) return;
+        resetState();
+        setStory(k);
+        say(NOTES[target].name);
+      });
+      storyBar.appendChild(b);
+    });
+  }
+
+  function setStory(idx) {
+    clearTimers();
+    storyIdx = idx;
+    pos = 0;
+    storyDone = false;
+    var st = STORIES[idx];
+    var n = st.melody.length;
+    stonesEl.innerHTML = '';
+    stoneEls = [];
+    stoneX = [];
+    for (var k = 0; k < n; k++) {
+      var x = 6 + k * (88 / (n - 1));
+      var d = document.createElement('div');
+      d.className = 'stone';
+      d.style.left = x + '%';
+      d.style.background = NOTES[st.melody[k]].color;
+      stonesEl.appendChild(d);
+      stoneEls.push(d);
+      stoneX.push(x);
+    }
+    var used = {};
+    st.melody.forEach(function (m) { used[m] = true; });
+    keyEls.forEach(function (key, i) { key.classList.toggle('unused', !used[i]); });
+    stage.setAttribute('data-scene', st.scene);
+    target = st.melody[0];
+    updateStory();
+    refreshStoryBar();
+    placeFox();
+    refreshTarget();
+    hintDefault();
+  }
+
   /* ---------- Textes d'aide et cible ---------- */
   function refreshTarget() {
-    keyEls.forEach(function (k, i) { k.classList.toggle('target', mode === 'escalier' && i === target); });
+    var guided = mode === 'escalier' || (mode === 'histoire' && !storyDone);
+    keyEls.forEach(function (k, i) { k.classList.toggle('target', guided && i === target); });
     stepEls.forEach(function (s, i) { s.classList.toggle('target', mode === 'escalier' && i === target); });
   }
 
@@ -666,8 +849,8 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     if (mode === 'escalier') {
       var n = NOTES[target];
       setHint('Aide ' + foxName + ' à monter ! Joue la touche ' + n.word + ' : ' + n.name + '.');
-    } else if (mode === 'tenir') {
-      setHint('Appuie sur une touche et tiens-la 8 secondes pour faire chanter ' + foxName + '.');
+    } else if (mode === 'histoire') {
+      setHint(storyCaption());
     } else {
       setHint('Joue ce que tu veux. Chaque touche a sa couleur et son son.');
     }
@@ -677,7 +860,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   function press(i, silent) {
     if (pressed[i]) return;
     var voice = silent ? null : startTone(NOTES[i].freq);
-    if (!silent) ignoreUntil = performance.now() + 700;
+    if (!silent) ignoreUntil = performance.now() + 450;
     pressed[i] = { voice: voice, t: performance.now(), silent: !!silent };
     keyEls[i].classList.add('down');
     spawnBubbles(i, 6);
@@ -701,18 +884,45 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
             placeFox();
             refreshTarget();
             hintDefault();
+            say(NOTES[target].name);
           }, 4200);
         } else {
           refreshTarget();
           hintDefault();
+          say(NOTES[target].name);
         }
       } else {
         foxAnim('wobble');
-        setHint('Presque ! Cherche la touche ' + NOTES[target].word + ' : ' + NOTES[target].name + '.');
+        say(NOTES[target].name);
       }
-    } else if (mode === 'tenir') {
-      if (activeHold === null) startHold(i);
-      else foxAnim('hop');
+    } else if (mode === 'histoire') {
+      var st = STORIES[storyIdx];
+      if (storyDone) {
+        foxAnim('hop');
+      } else if (i === st.melody[pos]) {
+        pos += 1;
+        placeFox();
+        foxAnim('hop');
+        if (pos >= st.melody.length) {
+          storyDone = true;
+          target = -1;
+          updateStory();
+          refreshTarget();
+          hintDefault();
+          reward();
+          saveStar(st.id);
+          later(function () { setStory(storyIdx); say(NOTES[target].name); }, 7000);
+        } else {
+          target = st.melody[pos];
+          updateStory();
+          refreshTarget();
+          hintDefault();
+          if (target !== i) say(NOTES[target].name);
+        }
+      } else {
+        foxAnim('wobble');
+        say(NOTES[st.melody[pos]].name);
+      }
     }
   }
 
@@ -721,77 +931,27 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     if (!p) return;
     delete pressed[i];
     keyEls[i].classList.remove('down');
-    if (!p.silent) ignoreUntil = performance.now() + 500;
+    if (!p.silent) ignoreUntil = performance.now() + 300;
     if (p.voice) {
       var elapsed = (performance.now() - p.t) / 1000;
       p.voice.stop(Math.max(0, 0.35 - elapsed));
     }
-    if (mode === 'tenir' && activeHold === i) endHold();
   }
 
   function releaseAll() {
     Object.keys(pressed).forEach(function (k) { release(Number(k)); });
   }
 
-  function setBar(p) {
-    fillEl.style.width = (p * 100) + '%';
-    countEl.textContent = Math.min(8, Math.floor(p * 8)) + ' / 8 s';
-  }
-
-  function startHold(i) {
-    activeHold = i;
-    holdStart = performance.now();
-    holdDone = false;
-    fillEl.classList.remove('drain');
-    fillEl.style.background = NOTES[i].color;
-    foxEl.classList.add('singing');
-    setHint(foxName + ' chante la note ' + NOTES[i].name + ' ! Continue de tenir.');
-    cancelAnimationFrame(rafId);
-    rafId = requestAnimationFrame(tick);
-  }
-
-  function tick(now) {
-    if (activeHold === null) return;
-    var p = Math.min(1, (now - holdStart) / HOLD_MS);
-    setBar(p);
-    if (p >= 1 && !holdDone) {
-      holdDone = true;
-      setHint('Bravo ! 8 secondes ! Tu peux relâcher.');
-      reward();
-    }
-    rafId = requestAnimationFrame(tick);
-  }
-
-  function endHold() {
-    cancelAnimationFrame(rafId);
-    activeHold = null;
-    foxEl.classList.remove('singing');
-    if (holdDone) {
-      later(function () {
-        fillEl.classList.add('drain');
-        setBar(0);
-        hintDefault();
-      }, 1200);
-    } else {
-      fillEl.classList.add('drain');
-      setBar(0);
-      setHint('Encore ! Essaie de tenir un peu plus longtemps.');
-    }
-  }
-
   function resetState() {
     clearTimers();
-    cancelAnimationFrame(rafId);
     releaseAll();
-    activeHold = null;
-    holdDone = false;
     micNote = -1;
     stepIdx = -1;
     target = 0;
-    foxEl.classList.remove('singing', 'hop', 'wobble');
+    pos = 0;
+    storyDone = false;
+    foxEl.classList.remove('hop', 'wobble');
     rainbowEl.classList.remove('show');
-    fillEl.classList.add('drain');
-    setBar(0);
   }
 
   function setMode(m) {
@@ -801,9 +961,17 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
       b.setAttribute('aria-pressed', b.getAttribute('data-mode') === m ? 'true' : 'false');
     });
     resetState();
-    placeFox();
-    refreshTarget();
-    hintDefault();
+    if (m === 'histoire') {
+      setStory(storyIdx);
+    } else {
+      stage.setAttribute('data-scene', 'day');
+      stage.style.setProperty('--rise', '0');
+      keyEls.forEach(function (k) { k.classList.remove('unused'); });
+      placeFox();
+      refreshTarget();
+      hintDefault();
+    }
+    if (m !== 'libre') say(NOTES[target].name);
   }
 
   document.querySelectorAll('#modes button').forEach(function (b) {
@@ -813,11 +981,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   nameInput.addEventListener('input', function () {
     foxName = nameInput.value.trim() || 'Renard';
     try { window.localStorage.setItem('renard-nom', foxName); } catch (e) { /* ignoré */ }
-    if (activeHold === null) {
-      quiet = true;
-      hintDefault();
-      quiet = false;
-    }
+    hintDefault();
   });
 
   /* ---------- Micro (piano acoustique, une note à la fois) ---------- */
@@ -838,6 +1002,14 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   var micLastSeen = 0;
   var micPressTime = 0;
   var lastRms = 0;
+
+  try {
+    var savedSens = window.localStorage.getItem('renard-sens');
+    if (savedSens) sensEl.value = savedSens;
+  } catch (e) { /* ignoré */ }
+  sensEl.addEventListener('input', function () {
+    try { window.localStorage.setItem('renard-sens', sensEl.value); } catch (e) { /* ignoré */ }
+  });
 
   /* DETECTION-START */
   // Hauteur du son par la méthode YIN simplifiée, entre 200 et 520 Hz
@@ -886,7 +1058,8 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   }
   /* DETECTION-END */
 
-  function threshold() { return 0.045 * Math.pow(0.7, Number(sensEl.value) - 1); }
+  // Échelle recalée : le maximum (10) est plus sensible qu'avant, et c'est la valeur par défaut
+  function threshold() { return 0.0012 * Math.pow(1.5, 10 - Number(sensEl.value)); }
 
   function micTick() {
     if (!analyser) return;
@@ -895,11 +1068,11 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     var s = 0;
     for (var n = 0; n < micBuf.length; n++) s += micBuf[n] * micBuf[n];
     var rms = Math.sqrt(s / micBuf.length);
-    levelEl.value = Math.min(1, rms / 0.1);
+    levelEl.value = Math.min(1, rms / 0.05);
 
-    // On n'écoute pas pendant que l'écran joue un son ou que la voix parle
+    // On n'écoute pas pendant que l'écran joue un son ou que la voix prononce une note
     var speaking = !!(synth && synth.speaking);
-    if (speaking) ignoreUntil = Math.max(ignoreUntil, now + 500);
+    if (speaking) ignoreUntil = Math.max(ignoreUntil, now + 300);
     if (now < ignoreUntil) {
       micLastSeen = now;
       micCand = -1;
@@ -1014,7 +1187,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     return -1;
   }
   document.addEventListener('keydown', function (e) {
-    if (e.repeat || e.target === nameInput || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.repeat || e.target === nameInput || e.target === sensEl || e.ctrlKey || e.metaKey || e.altKey) return;
     var i = keyIndex(e);
     if (i >= 0) press(i);
   });

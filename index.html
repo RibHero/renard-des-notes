@@ -60,7 +60,7 @@ h1 {
   text-wrap: balance;
 }
 #modes { display: flex; gap: 6px; flex-wrap: wrap; }
-#modes button, #voice {
+#modes button, #voice, #mic {
   font: inherit;
   font-family: var(--display);
   font-weight: 500;
@@ -72,8 +72,8 @@ h1 {
   color: var(--ink);
   cursor: pointer;
 }
-#modes button[aria-pressed="true"], #voice[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
-#voice:disabled { opacity: 0.5; cursor: default; }
+#modes button[aria-pressed="true"], #voice[aria-pressed="true"], #mic[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+#voice:disabled, #mic:disabled { opacity: 0.5; cursor: default; }
 .namebox { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
 .namebox input {
   font: inherit;
@@ -100,6 +100,26 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   text-align: center;
   text-wrap: balance;
 }
+
+#micbox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 18px;
+  font-size: 0.95rem;
+}
+#micbox[hidden] { display: none; }
+#mic-note {
+  min-width: 11em;
+  text-align: center;
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 1.15rem;
+}
+#level { width: 140px; height: 12px; accent-color: var(--c-fa); }
+#sens-wrap { display: flex; align-items: center; gap: 8px; }
+#sens { width: 120px; accent-color: var(--ink); }
 
 #stage {
   position: relative;
@@ -284,12 +304,19 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
       <button type="button" data-mode="libre" aria-pressed="false">Jeu libre</button>
     </div>
     <button type="button" id="voice" aria-pressed="true">Voix : oui</button>
+    <button type="button" id="mic" aria-pressed="false">Micro : non</button>
     <label class="namebox" for="fox-name">Nom du renard
       <input id="fox-name" type="text" maxlength="14" value="Renard" autocomplete="off">
     </label>
   </header>
 
   <p id="hint" role="status" aria-live="polite"></p>
+
+  <div id="micbox" hidden>
+    <span id="mic-note">J'entends : rien</span>
+    <progress id="level" max="1" value="0" aria-label="Volume du micro"></progress>
+    <label id="sens-wrap" for="sens">Sensibilité <input id="sens" type="range" min="1" max="10" value="5"></label>
+  </div>
 
   <main id="stage">
     <div class="cloud" style="left:6%; top:10%; width:110px"></div>
@@ -451,6 +478,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   var voiceOn = true;
   var userActed = false;   // les navigateurs refusent de parler avant le premier geste
   var quiet = false;
+  var ignoreUntil = 0;     // pause de l'écoute du micro (sons de l'écran, voix)
   var frVoice = null;
 
   try {
@@ -476,6 +504,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
       if (frVoice) u.voice = frVoice;
       u.rate = 0.9;
       u.pitch = 1.1;
+      ignoreUntil = performance.now() + 900;
       synth.speak(u);
     } catch (e) { /* voix indisponible : le jeu continue sans */ }
   }
@@ -645,10 +674,11 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   }
 
   /* ---------- Jeu ---------- */
-  function press(i) {
+  function press(i, silent) {
     if (pressed[i]) return;
-    var voice = startTone(NOTES[i].freq);
-    pressed[i] = { voice: voice, t: performance.now() };
+    var voice = silent ? null : startTone(NOTES[i].freq);
+    if (!silent) ignoreUntil = performance.now() + 700;
+    pressed[i] = { voice: voice, t: performance.now(), silent: !!silent };
     keyEls[i].classList.add('down');
     spawnBubbles(i, 6);
 
@@ -691,6 +721,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     if (!p) return;
     delete pressed[i];
     keyEls[i].classList.remove('down');
+    if (!p.silent) ignoreUntil = performance.now() + 500;
     if (p.voice) {
       var elapsed = (performance.now() - p.t) / 1000;
       p.voice.stop(Math.max(0, 0.35 - elapsed));
@@ -754,6 +785,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     releaseAll();
     activeHold = null;
     holdDone = false;
+    micNote = -1;
     stepIdx = -1;
     target = 0;
     foxEl.classList.remove('singing', 'hop', 'wobble');
@@ -786,6 +818,193 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
       hintDefault();
       quiet = false;
     }
+  });
+
+  /* ---------- Micro (piano acoustique, une note à la fois) ---------- */
+  var micBtn = document.getElementById('mic');
+  var micBox = document.getElementById('micbox');
+  var micNoteEl = document.getElementById('mic-note');
+  var levelEl = document.getElementById('level');
+  var sensEl = document.getElementById('sens');
+  var micOn = false;
+  var micStream = null;
+  var micSource = null;
+  var analyser = null;
+  var micBuf = null;
+  var micTimer = 0;
+  var micNote = -1;        // note actuellement tenue au piano (-1 = aucune)
+  var micCand = -1;
+  var micCount = 0;
+  var micLastSeen = 0;
+  var micPressTime = 0;
+  var lastRms = 0;
+
+  /* DETECTION-START */
+  // Hauteur du son par la méthode YIN simplifiée, entre 200 et 520 Hz
+  function detectPitch(buf, sr) {
+    var W = 2048;
+    var minLag = Math.floor(sr / 520);
+    var maxLag = Math.ceil(sr / 200);
+    if (buf.length < W + maxLag + 2) return -1;
+    var d = new Float32Array(maxLag + 2);
+    var tau, j, diff, sum;
+    for (tau = 1; tau <= maxLag + 1; tau++) {
+      sum = 0;
+      for (j = 0; j < W; j++) { diff = buf[j] - buf[j + tau]; sum += diff * diff; }
+      d[tau] = sum;
+    }
+    var cm = new Float32Array(maxLag + 2);
+    var run = 0;
+    cm[0] = 1;
+    for (tau = 1; tau <= maxLag + 1; tau++) {
+      run += d[tau];
+      cm[tau] = run === 0 ? 1 : d[tau] * tau / run;
+    }
+    var best = -1;
+    for (var k = minLag; k <= maxLag; k++) {
+      if (cm[k] < 0.2) {
+        while (k + 1 <= maxLag && cm[k + 1] < cm[k]) k++;
+        best = k;
+        break;
+      }
+    }
+    if (best < 0) return -1;
+    var x0 = cm[best - 1], x1 = cm[best], x2 = cm[best + 1];
+    var denom = x0 + x2 - 2 * x1;
+    var shift = denom !== 0 ? (x0 - x2) / (2 * denom) : 0;
+    return sr / (best + shift);
+  }
+
+  // Note la plus proche parmi les touches du jeu, à 45 centièmes de ton près
+  function noteFromFreq(f) {
+    var bi = -1, bc = 1e9;
+    for (var i = 0; i < ACTIVE; i++) {
+      var c = Math.abs(1200 * Math.log(f / NOTES[i].freq) / Math.LN2);
+      if (c < bc) { bc = c; bi = i; }
+    }
+    return bc <= 45 ? bi : -1;
+  }
+  /* DETECTION-END */
+
+  function threshold() { return 0.045 * Math.pow(0.7, Number(sensEl.value) - 1); }
+
+  function micTick() {
+    if (!analyser) return;
+    var now = performance.now();
+    analyser.getFloatTimeDomainData(micBuf);
+    var s = 0;
+    for (var n = 0; n < micBuf.length; n++) s += micBuf[n] * micBuf[n];
+    var rms = Math.sqrt(s / micBuf.length);
+    levelEl.value = Math.min(1, rms / 0.1);
+
+    // On n'écoute pas pendant que l'écran joue un son ou que la voix parle
+    var speaking = !!(synth && synth.speaking);
+    if (speaking) ignoreUntil = Math.max(ignoreUntil, now + 500);
+    if (now < ignoreUntil) {
+      micLastSeen = now;
+      micCand = -1;
+      micCount = 0;
+      lastRms = rms;
+      return;
+    }
+
+    var thr = threshold();
+    var gate = micNote >= 0 ? thr * 0.4 : thr;   // un son qui s'éteint reste valable plus longtemps
+    var idx = -1;
+    if (rms >= gate) {
+      var f = detectPitch(micBuf, ac.sampleRate);
+      if (f > 0) idx = noteFromFreq(f);
+    }
+    micNoteEl.textContent = idx >= 0 ? "J'entends : " + NOTES[idx].name : (rms >= gate ? "J'entends un son…" : "J'entends : rien");
+
+    if (idx >= 0 && idx === micCand) micCount += 1;
+    else { micCand = idx; micCount = idx >= 0 ? 1 : 0; }
+
+    if (micNote < 0) {
+      if (micCand >= 0 && micCount >= 3) {
+        micNote = micCand;
+        micLastSeen = now;
+        micPressTime = now;
+        press(micNote, true);
+      }
+    } else if (idx === micNote) {
+      micLastSeen = now;
+      // même note rejouée sans silence : nouvelle attaque
+      if (now - micPressTime > 250 && rms > lastRms * 1.8 && rms > thr) {
+        release(micNote);
+        micPressTime = now;
+        press(micNote, true);
+      }
+    } else if (idx >= 0 && idx === micCand && micCount >= 3) {
+      release(micNote);
+      micNote = micCand;
+      micLastSeen = now;
+      micPressTime = now;
+      press(micNote, true);
+    } else if (idx < 0 && now - micLastSeen > 250) {
+      release(micNote);
+      micNote = -1;
+    }
+    lastRms = rms;
+  }
+
+  function refreshMicBtn() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      micBtn.textContent = 'Micro indisponible';
+      micBtn.disabled = true;
+      micBtn.setAttribute('aria-pressed', 'false');
+      return;
+    }
+    micBtn.textContent = 'Micro : ' + (micOn ? 'oui' : 'non');
+    micBtn.setAttribute('aria-pressed', micOn ? 'true' : 'false');
+  }
+  refreshMicBtn();
+
+  function micStop() {
+    clearInterval(micTimer);
+    micTimer = 0;
+    if (micNote >= 0) release(micNote);
+    micNote = -1;
+    if (micStream) micStream.getTracks().forEach(function (t) { t.stop(); });
+    try { if (micSource) micSource.disconnect(); } catch (e) { /* ignoré */ }
+    micStream = null;
+    micSource = null;
+    analyser = null;
+    micOn = false;
+    micBox.hidden = true;
+    refreshMicBtn();
+  }
+
+  function micStart() {
+    var c = audio();
+    if (!c || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setHint("Ce navigateur ne permet pas d'utiliser le micro.");
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    }).then(function (stream) {
+      micStream = stream;
+      micSource = c.createMediaStreamSource(stream);
+      analyser = c.createAnalyser();
+      analyser.fftSize = 4096;
+      micBuf = new Float32Array(analyser.fftSize);
+      micSource.connect(analyser);   // pas relié à la sortie : aucun écho
+      micOn = true;
+      micBox.hidden = false;
+      refreshMicBtn();
+      micTimer = setInterval(micTick, 40);
+      setHint('Le micro écoute. Joue une note sur ton piano.');
+    }).catch(function () {
+      micOn = false;
+      refreshMicBtn();
+      setHint("Le micro est bloqué. Autorise-le dans les réglages du navigateur, puis réessaie.");
+    });
+  }
+
+  micBtn.addEventListener('click', function () {
+    if (micOn) micStop();
+    else micStart();
   });
 
   /* Clavier de l'ordinateur : A S D F G */

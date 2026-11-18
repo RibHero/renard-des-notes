@@ -110,7 +110,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   justify-content: center;
   gap: 8px;
 }
-[data-mode="histoire"] #storybar { display: flex; }
+[data-mode="histoire"] #storybar, [data-mode="escalier"] #storybar { display: flex; }
 
 #micbox {
   display: flex;
@@ -455,8 +455,6 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   var ACTIVE = 5;
   var STEP_H = 11;        // hauteur d'une marche, en % de la scène
   var GROUND = 8;         // épaisseur du sol, en % de la scène
-  var WINDOW_MS = 550;    // tolérance de rythme, de part et d'autre de l'instant de la note
-  var MIC_LATENCY = 160;  // délai de détection du micro, compensé dans le rythme
 
   /* STORIES-START */
   // Mélodies du domaine public (chansons traditionnelles et Beethoven), écrites en numéros de notes :
@@ -501,6 +499,13 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   ];
   /* STORIES-END */
 
+  // Niveaux de l'escalier : suites de notes (0 = do ... 4 = sol), de plus en plus longues
+  var ESCALIERS = [
+    { short: 'Monter', seq: [0, 1, 2, 3, 4] },
+    { short: 'Aller-retour', seq: [0, 1, 2, 3, 4, 3, 2, 1, 0, 1, 2, 3, 4, 3, 2, 1, 0] },
+    { short: 'Sauts', seq: [0, 2, 1, 3, 2, 4, 3, 4, 2, 3, 1, 2, 0, 1, 0, 4, 0, 4, 1, 3, 0, 2, 4, 2, 0] }
+  ];
+
   /* RHYTHM-START */
   // Instant de départ de chaque note, en temps
   function buildTimeline(beats) {
@@ -508,19 +513,20 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     for (var k = 0; k < beats.length; k++) { start.push(t); t += beats[k]; }
     return { start: start, total: t };
   }
-  // Note attendue la plus ancienne, de même hauteur, dans la fenêtre de tolérance (-1 si aucune)
-  function findHit(status, melody, dueMs, elMs, pitch, windowMs) {
-    for (var k = 0; k < melody.length; k++) {
-      if (status[k] !== 0) continue;
-      if (Math.abs(elMs - dueMs[k]) > windowMs) continue;
-      if (melody[k] === pitch) return k;
-    }
+  // Prochaine note pas encore jouée (-1 si toutes jouées)
+  function nextPending(status) {
+    for (var k = 0; k < status.length; k++) if (status[k] === 0) return k;
     return -1;
   }
-  // 3 étoiles dès 85 % de notes jouées, 2 dès 60 %, au moins 1 pour avoir fini
-  function scoreStars(hits, total) {
-    var r = total ? hits / total : 0;
-    return r >= 0.85 ? 3 : (r >= 0.6 ? 2 : 1);
+  // Le temps de jeu avance seul mais s'arrête sur la prochaine note non jouée
+  function advanceClock(clock, dt, status, dueMs) {
+    var n = nextPending(status);
+    var c = clock + dt;
+    return n >= 0 ? Math.min(c, dueMs[n]) : c;
+  }
+  // 3 étoiles avec peu de fausses notes, 2 avec un nombre moyen, 1 sinon (on gagne toujours au moins 1 étoile)
+  function scoreStars(wrong, total) {
+    return wrong <= total / 3 ? 3 : (wrong <= total ? 2 : 1);
   }
   /* RHYTHM-END */
 
@@ -548,13 +554,15 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   var pressed = {};          // index -> { voice, t, silent }
   var timers = [];
   var storyIdx = 0;
+  var escLevel = 0;
+  var escPos = 0;
   var starList = [];
   var flagList = [];
   var stars = {};            // étoiles gagnées par histoire (meilleur score)
   var hitX = 160;
   var pxBeat = 150;
   var run = {
-    state: 'ready', t0: 0, beatMs: 1000, totalMs: 0, due: [], status: [], blocks: [],
+    state: 'ready', clock: 0, last: 0, wrong: 0, beatMs: 1000, totalMs: 0, due: [], status: [], blocks: [],
     hits: 0, passed: 0, raf: 0, lastNs: -1, lastTarget: -2, finalStars: 0
   };
 
@@ -854,7 +862,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     var st = STORIES[storyIdx];
     if (run.state === 'ready') {
       var n = NOTES[st.melody[0]];
-      return 'Joue la touche ' + n.word + ' (' + n.name + ') pour partir !';
+      return 'Joue la touche ' + n.word + ' (' + n.name + ') pour partir ! ' + foxName + ' attend.';
     }
     var text = st.chapters[0].text;
     st.chapters.forEach(function (c) { if (c.at <= run.passed) text = c.text; });
@@ -884,7 +892,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
       b.style.width = Math.max(40, Math.round(st.beats[k] * pxBeat - 12)) + 'px';
     });
     hitEl.style.left = hitX + 'px';
-    var beats = run.state === 'run' ? (performance.now() - run.t0) / run.beatMs : 0;
+    var beats = run.state === 'run' ? run.clock / run.beatMs : 0;
     trackEl.style.transform = 'translateX(' + (hitX - beats * pxBeat) + 'px)';
   }
 
@@ -916,6 +924,8 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     run.due = tl.start.map(function (b) { return b * run.beatMs; });
     run.status = st.melody.map(function () { return 0; });
     run.hits = 0;
+    run.wrong = 0;
+    run.clock = 0;
     run.passed = 0;
     run.lastNs = -1;
     run.lastTarget = -2;
@@ -947,8 +957,37 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     hintDefault();
   }
 
+  function setEscLevel(k) {
+    clearTimers();
+    escLevel = k;
+    escPos = 0;
+    stepIdx = -1;
+    target = ESCALIERS[k].seq[0];
+    rainbowEl.classList.remove('show');
+    foxEl.classList.remove('hop', 'wobble');
+    refreshStoryBar();
+    placeFox();
+    refreshTarget();
+    hintDefault();
+  }
+
   function refreshStoryBar() {
     storyBar.innerHTML = '';
+    if (mode === 'escalier') {
+      ESCALIERS.forEach(function (s, k) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.setAttribute('aria-pressed', k === escLevel ? 'true' : 'false');
+        b.textContent = 'Niveau ' + (k + 1) + ' : ' + s.short + (stars['esc' + k] ? ' \u2605' : '');
+        b.addEventListener('click', function () {
+          resetState();
+          setEscLevel(k);
+          say(NOTES[target].name);
+        });
+        storyBar.appendChild(b);
+      });
+      return;
+    }
     STORIES.forEach(function (s, k) {
       var b = document.createElement('button');
       var n = Math.min(3, Number(stars[s.id]) || 0);
@@ -978,7 +1017,8 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
 
   function startRun(t) {
     run.state = 'run';
-    run.t0 = t;
+    run.clock = 0;
+    run.last = t;
     foxEl.classList.add('run');
     hintDefault();
     run.raf = requestAnimationFrame(storyTick);
@@ -989,7 +1029,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     cancelAnimationFrame(run.raf);
     run.state = 'done';
     foxEl.classList.remove('run');
-    run.finalStars = scoreStars(run.hits, st.melody.length);
+    run.finalStars = scoreStars(run.wrong, st.melody.length);
     stars[st.id] = Math.max(Number(stars[st.id]) || 0, run.finalStars);
     try { window.localStorage.setItem('renard-etoiles', JSON.stringify(stars)); } catch (e) { /* ignoré */ }
     refreshStoryBar();
@@ -1004,30 +1044,25 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   function storyTick(now) {
     if (run.state !== 'run') return;
     var st = STORIES[storyIdx];
-    var el = now - run.t0;
-    var beats = el / run.beatMs;
+    var before = run.clock;
+    run.clock = advanceClock(run.clock, Math.min(100, now - run.last), run.status, run.due);
+    run.last = now;
+    var moving = run.clock > before + 0.5;
+    foxEl.classList.toggle('run', moving);
+    var beats = run.clock / run.beatMs;
     trackEl.style.transform = 'translateX(' + (hitX - beats * pxBeat) + 'px)';
     hillsEl.style.backgroundPositionX = (-beats * pxBeat * 0.25) + 'px';
     groundEl.style.backgroundPositionX = (-beats * pxBeat) + 'px';
 
     var passed = 0;
-    var changed = false;
-    for (var k = 0; k < st.melody.length; k++) {
-      if (run.due[k] <= el) passed += 1;
-      if (run.status[k] === 0 && el > run.due[k] + WINDOW_MS) {
-        run.status[k] = 2;
-        run.blocks[k].classList.add('missed');
-        changed = true;
-      }
-    }
-    if (changed) setNextTarget();
+    for (var k = 0; k < st.melody.length; k++) if (run.status[k] === 1) passed += 1;
     if (passed !== run.passed) {
       run.passed = passed;
       hintDefault();
     }
-    updateSky(Math.min(1, el / run.totalMs));
+    updateSky(Math.min(1, run.clock / run.totalMs));
 
-    if (el > run.totalMs + 800) { finishRun(); return; }
+    if (nextPending(run.status) < 0 && run.clock >= run.totalMs) { finishRun(); return; }
     run.raf = requestAnimationFrame(storyTick);
   }
 
@@ -1041,7 +1076,8 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   function hintDefault() {
     if (mode === 'escalier') {
       var n = NOTES[target];
-      setHint('Aide ' + foxName + ' à monter ! Joue la touche ' + n.word + ' : ' + n.name + '.');
+      var tot = ESCALIERS[escLevel].seq.length;
+      setHint('Joue la touche ' + n.word + ' : ' + n.name + '.  (' + (escPos + 1) + ' sur ' + tot + ')');
     } else if (mode === 'histoire') {
       setHint(storyCaption());
     } else {
@@ -1062,24 +1098,24 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
       foxAnim('hop');
       say(NOTES[i].name);
     } else if (mode === 'escalier') {
+      var seq = ESCALIERS[escLevel].seq;
       stepIdx = i;
       placeFox();
       if (i === target) {
-        target += 1;
+        escPos += 1;
         foxAnim('hop');
-        if (target >= ACTIVE) {
-          setHint('Bravo ! ' + foxName + ' est tout en haut !');
+        if (escPos >= seq.length) {
+          target = -1;
+          var key = 'esc' + escLevel;
+          stars[key] = 3;
+          try { window.localStorage.setItem('renard-etoiles', JSON.stringify(stars)); } catch (e) { /* ignoré */ }
+          refreshStoryBar();
+          setHint('Bravo ! ' + foxName + ' a trouvé l\u2019arc-en-ciel !');
           refreshTarget();
           reward();
-          later(function () {
-            target = 0;
-            stepIdx = -1;
-            placeFox();
-            refreshTarget();
-            hintDefault();
-            say(NOTES[target].name);
-          }, 4200);
+          later(function () { setEscLevel(escLevel); say(NOTES[target].name); }, 4800);
         } else {
+          target = seq[escPos];
           refreshTarget();
           hintDefault();
           say(NOTES[target].name);
@@ -1090,21 +1126,25 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
       }
     } else if (mode === 'histoire') {
       var st = STORIES[storyIdx];
-      var tNow = performance.now() - (silent ? MIC_LATENCY : 0);
       if (run.state === 'done') {
         foxAnim('hop');
       } else if (run.state === 'ready') {
         if (i === st.melody[0]) {
-          startRun(tNow);
+          startRun(performance.now());
           registerHit(0);
         } else {
           foxAnim('wobble');
           say(NOTES[st.melody[0]].name);
         }
       } else {
-        var k = findHit(run.status, st.melody, run.due, tNow - run.t0, i, WINDOW_MS);
-        if (k >= 0) registerHit(k);
-        else foxAnim('wobble');
+        var k = nextPending(run.status);
+        if (k >= 0 && st.melody[k] === i) {
+          run.clock = Math.max(run.clock, run.due[k]);
+          registerHit(k);
+        } else {
+          run.wrong += 1;
+          foxAnim('wobble');
+        }
       }
     }
   }
@@ -1149,9 +1189,8 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
       stage.setAttribute('data-scene', 'day');
       stage.style.setProperty('--rise', '0');
       keyEls.forEach(function (k) { k.classList.remove('unused'); });
-      placeFox();
-      refreshTarget();
-      hintDefault();
+      if (m === 'escalier') setEscLevel(escLevel);
+      else { storyBar.innerHTML = ''; placeFox(); refreshTarget(); hintDefault(); }
     }
     if (m !== 'libre') say(NOTES[target].name);
   }

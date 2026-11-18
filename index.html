@@ -136,10 +136,11 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   --sky-a: var(--sky-top);
   --sky-b: var(--sky-bottom);
   --ground-c: var(--ground);
+  --hill: #a9dba0;
   --rise: 0;
   position: relative;
   flex: 1;
-  min-height: 260px;
+  min-height: 280px;
   overflow: hidden;
   border-radius: 28px;
   border: 3px solid var(--ink);
@@ -147,9 +148,9 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     linear-gradient(to top, var(--ground-c) 0 8%, transparent 8%),
     linear-gradient(to bottom, var(--sky-a), var(--sky-b));
 }
-#stage[data-scene="night"] { --sky-a: #14204a; --sky-b: #3a4f8f; --ground-c: #2f6b4a; }
-#stage[data-scene="morning"] { --sky-a: #ff9f7a; --sky-b: #ffe9b8; --ground-c: #8ed081; }
-#stage[data-scene="party"] { --sky-a: #7a4fd0; --sky-b: #ffb3d9; --ground-c: #7bc47f; }
+#stage[data-scene="night"] { --sky-a: #14204a; --sky-b: #3a4f8f; --ground-c: #2f6b4a; --hill: #1f3566; }
+#stage[data-scene="morning"] { --sky-a: #ff9f7a; --sky-b: #ffe9b8; --ground-c: #8ed081; --hill: #eaa27f; }
+#stage[data-scene="party"] { --sky-a: #7a4fd0; --sky-b: #ffb3d9; --ground-c: #7bc47f; --hill: #6a46b8; }
 
 .cloud {
   position: absolute;
@@ -193,8 +194,8 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
 }
 .flag.on { opacity: 1; }
 #orb {
-  left: 80%;
-  bottom: calc(8% + var(--rise) * 52%);
+  left: 84%;
+  bottom: calc(8% + var(--rise) * 55%);
   width: clamp(46px, 8vw, 78px);
   aspect-ratio: 1;
   border-radius: 50%;
@@ -205,6 +206,53 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
 #stage[data-scene="night"] #orb { background: #fff6c9; box-shadow: 0 0 28px 8px rgba(255, 246, 201, 0.5); }
 #stage[data-scene="morning"] #orb { background: #ffb02e; box-shadow: 0 0 30px 10px rgba(255, 176, 46, 0.45); }
 #stage[data-scene="party"] #orb { background: #ffd23f; box-shadow: 0 0 30px 10px rgba(255, 210, 63, 0.5); }
+
+/* Décor qui défile (jeu des histoires) */
+#hills, #groundline, #track, #hitline { display: none; position: absolute; pointer-events: none; }
+[data-mode="histoire"] #hills, [data-mode="histoire"] #groundline, [data-mode="histoire"] #track, [data-mode="histoire"] #hitline { display: block; }
+#hills {
+  left: 0;
+  right: 0;
+  bottom: 8%;
+  height: 22%;
+  background-image: radial-gradient(ellipse 150px 100% at 50% 100%, var(--hill) 96%, transparent 100%);
+  background-size: 300px 100%;
+  background-repeat: repeat-x;
+  background-position: 0 100%;
+}
+#groundline {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 8%;
+  background-image: repeating-linear-gradient(90deg, rgba(30, 42, 68, 0.16) 0 28px, transparent 28px 56px);
+  background-size: 56px 100%;
+}
+#hitline {
+  top: 6%;
+  bottom: 8%;
+  width: 6px;
+  margin-left: -3px;
+  border-radius: 3px;
+  background: rgba(30, 42, 68, 0.3);
+}
+#track { left: 0; top: 0; bottom: 0; width: 0; will-change: transform; }
+.note {
+  position: absolute;
+  height: clamp(60px, 20%, 108px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid var(--ink);
+  border-radius: 22px;
+  box-shadow: 0 5px 0 var(--ink);
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: clamp(1.4rem, 3.6vw, 2.2rem);
+  transition: opacity 0.3s, transform 0.25s;
+}
+.note.hit { opacity: 0; transform: scale(1.4); }
+.note.missed { opacity: 0.22; }
 
 #steps { position: absolute; inset: 0; pointer-events: none; transition: opacity 0.3s, transform 0.3s; }
 [data-mode="libre"] #steps, [data-mode="histoire"] #steps { opacity: 0; transform: translateY(14%); }
@@ -226,36 +274,25 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
 .step.target { animation: glow 0.9s ease-in-out infinite alternate; }
 @keyframes glow { from { box-shadow: 0 0 0 0 rgba(30, 42, 68, 0); } to { box-shadow: 0 0 0 8px rgba(30, 42, 68, 0.28); } }
 
-#stones { display: none; position: absolute; inset: 0; pointer-events: none; }
-[data-mode="histoire"] #stones { display: block; }
-.stone {
-  position: absolute;
-  bottom: 2.2%;
-  width: clamp(12px, 2.1vw, 22px);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  border: 3px solid var(--ink);
-  transform: translateX(-50%);
-  opacity: 0.4;
-}
-.stone.done { opacity: 1; }
-.stone.next { opacity: 1; animation: pulse 0.8s ease-in-out infinite alternate; }
-@keyframes pulse { from { transform: translateX(-50%) scale(1); } to { transform: translateX(-50%) scale(1.35); } }
-
 #fox {
   position: absolute;
-  width: clamp(76px, min(14vw, 22vh), 130px);
+  width: clamp(80px, min(14vw, 22vh), 130px);
   aspect-ratio: 120 / 130;
   transform: translateX(-50%);
   transition: left 0.45s cubic-bezier(0.3, 1.5, 0.5, 1), bottom 0.45s cubic-bezier(0.3, 1.5, 0.5, 1);
 }
 #fox svg { width: 100%; height: 100%; display: block; overflow: visible; transform-origin: 50% 100%; }
+#fox.run svg { animation: bob 0.32s ease-in-out infinite alternate; }
 #fox.hop svg { animation: hop 0.45s ease-out; }
 #fox.wobble svg { animation: wobble 0.5s ease-in-out; }
+@keyframes bob {
+  from { transform: translateY(0) rotate(-2deg); }
+  to { transform: translateY(-7px) rotate(2deg); }
+}
 @keyframes hop {
   0% { transform: scale(1, 1); }
   30% { transform: scale(1.1, 0.86); }
-  60% { transform: translateY(-14px) scale(0.95, 1.08); }
+  60% { transform: translateY(-18px) scale(0.95, 1.08); }
   100% { transform: scale(1, 1); }
 }
 @keyframes wobble {
@@ -285,7 +322,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
 #keys {
   display: flex;
   gap: 8px;
-  height: clamp(150px, 28vh, 240px);
+  height: clamp(150px, 26vh, 230px);
 }
 .key {
   position: relative;
@@ -367,8 +404,11 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     <div id="stars"></div>
     <div id="flags"></div>
     <div id="orb"></div>
+    <div id="hills"></div>
+    <div id="groundline"></div>
     <div id="steps"></div>
-    <div id="stones"></div>
+    <div id="hitline"></div>
+    <div id="track"></div>
     <svg id="rainbow" viewBox="0 0 400 220" aria-hidden="true"></svg>
     <div id="fox" aria-hidden="true">
       <svg viewBox="0 0 120 130">
@@ -413,27 +453,31 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     { name: 'si',  freq: 493.88, color: '#e0559c', text: '#ffffff', word: 'rose',   key: 'j' }
   ];
   var ACTIVE = 5;
-  var STEP_H = 11;   // hauteur d'une marche, en % de la scène
-  var GROUND = 8;    // épaisseur du sol, en % de la scène
+  var STEP_H = 11;        // hauteur d'une marche, en % de la scène
+  var GROUND = 8;         // épaisseur du sol, en % de la scène
+  var WINDOW_MS = 550;    // tolérance de rythme, de part et d'autre de l'instant de la note
+  var MIC_LATENCY = 160;  // délai de détection du micro, compensé dans le rythme
 
   /* STORIES-START */
   // Mélodies du domaine public (chansons traditionnelles et Beethoven), écrites en numéros de notes :
-  // 0 = do, 1 = ré, 2 = mi, 3 = fa, 4 = sol. Les textes des histoires sont originaux.
+  // 0 = do, 1 = ré, 2 = mi, 3 = fa, 4 = sol. "beats" donne la durée de chaque note en temps. Textes originaux.
   var STORIES = [
     {
-      id: 'lune', short: 'La lune', scene: 'night',
+      id: 'lune', short: 'La lune', scene: 'night', bpm: 54,
       melody: [0, 0, 0, 1, 2, 1, 0, 2, 1, 1, 0,  0, 0, 0, 1, 2, 1, 0, 2, 1, 1, 0],
+      beats:  [1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 4,  1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 4],
       chapters: [
         { at: 0,  text: '{nom} sort de son terrier. Il fait nuit.' },
         { at: 6,  text: 'Les étoiles s’allument une à une.' },
         { at: 11, text: '{nom} traverse le champ. Où est la lune ?' },
         { at: 17, text: 'Là-haut, elle se montre petit à petit.' }
       ],
-      end: 'La lune brille ! {nom} est tout content. Bravo !'
+      end: 'La lune brille ! {nom} est tout content.'
     },
     {
-      id: 'reveil', short: 'Le réveil', scene: 'morning',
+      id: 'reveil', short: 'Le réveil', scene: 'morning', bpm: 60,
       melody: [0, 1, 2, 0,  0, 1, 2, 0,  2, 3, 4,  2, 3, 4],
+      beats:  [1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 2,  1, 1, 2],
       chapters: [
         { at: 0,  text: 'Le jour se lève. {nom} va réveiller ses amis.' },
         { at: 4,  text: 'Toc toc ! Le hibou ouvre un œil.' },
@@ -443,8 +487,9 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
       end: 'Tout le monde est réveillé ! Quelle belle journée !'
     },
     {
-      id: 'fete', short: 'La fête', scene: 'party',
+      id: 'fete', short: 'La fête', scene: 'party', bpm: 64,
       melody: [2, 2, 3, 4,  4, 3, 2, 1,  0, 0, 1, 2,  1, 0, 0],
+      beats:  [1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1.5, 0.5, 2],
       chapters: [
         { at: 0,  text: 'Aujourd’hui, c’est la fête dans la forêt !' },
         { at: 4,  text: '{nom} accroche les guirlandes.' },
@@ -456,12 +501,38 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   ];
   /* STORIES-END */
 
+  /* RHYTHM-START */
+  // Instant de départ de chaque note, en temps
+  function buildTimeline(beats) {
+    var start = [], t = 0;
+    for (var k = 0; k < beats.length; k++) { start.push(t); t += beats[k]; }
+    return { start: start, total: t };
+  }
+  // Note attendue la plus ancienne, de même hauteur, dans la fenêtre de tolérance (-1 si aucune)
+  function findHit(status, melody, dueMs, elMs, pitch, windowMs) {
+    for (var k = 0; k < melody.length; k++) {
+      if (status[k] !== 0) continue;
+      if (Math.abs(elMs - dueMs[k]) > windowMs) continue;
+      if (melody[k] === pitch) return k;
+    }
+    return -1;
+  }
+  // 3 étoiles dès 85 % de notes jouées, 2 dès 60 %, au moins 1 pour avoir fini
+  function scoreStars(hits, total) {
+    var r = total ? hits / total : 0;
+    return r >= 0.85 ? 3 : (r >= 0.6 ? 2 : 1);
+  }
+  /* RHYTHM-END */
+
   var app = document.getElementById('app');
   var stage = document.getElementById('stage');
   var stepsEl = document.getElementById('steps');
-  var stonesEl = document.getElementById('stones');
   var starsEl = document.getElementById('stars');
   var flagsEl = document.getElementById('flags');
+  var hillsEl = document.getElementById('hills');
+  var groundEl = document.getElementById('groundline');
+  var trackEl = document.getElementById('track');
+  var hitEl = document.getElementById('hitline');
   var keysEl = document.getElementById('keys');
   var fxEl = document.getElementById('fx');
   var foxEl = document.getElementById('fox');
@@ -477,13 +548,15 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   var pressed = {};          // index -> { voice, t, silent }
   var timers = [];
   var storyIdx = 0;
-  var pos = 0;
-  var storyDone = false;
-  var stoneEls = [];
-  var stoneX = [];
   var starList = [];
   var flagList = [];
-  var stars = {};
+  var stars = {};            // étoiles gagnées par histoire (meilleur score)
+  var hitX = 160;
+  var pxBeat = 150;
+  var run = {
+    state: 'ready', t0: 0, beatMs: 1000, totalMs: 0, due: [], status: [], blocks: [],
+    hits: 0, passed: 0, raf: 0, lastNs: -1, lastTarget: -2, finalStars: 0
+  };
 
   try {
     var saved = window.localStorage.getItem('renard-nom');
@@ -624,8 +697,12 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     }
   });
 
+  // Premier geste : la voix peut parler, et le micro mémorisé redémarre tout seul
   ['pointerdown', 'keydown'].forEach(function (ev) {
-    document.addEventListener(ev, function () { userActed = true; }, true);
+    document.addEventListener(ev, function () {
+      userActed = true;
+      if (micWanted && !micOn && !micStarting) micStart(true);
+    }, true);
   });
 
   /* ---------- Construction de l'interface ---------- */
@@ -690,6 +767,9 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     }
   })();
 
+  // Les animations du renard se terminent d'elles-mêmes (la course reprend ensuite)
+  foxEl.addEventListener('animationend', function () { foxEl.classList.remove('hop', 'wobble'); });
+
   /* ---------- Utilitaires ---------- */
   function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
   function clearTimers() { timers.forEach(clearTimeout); timers = []; }
@@ -712,28 +792,30 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
       if (stepIdx < 0) foxTo(8, GROUND);
       else foxTo(4 + (stepIdx + 0.5) * (92 / ACTIVE), GROUND + (stepIdx + 1) * STEP_H);
     } else if (mode === 'histoire') {
-      foxTo(pos === 0 ? 3.5 : stoneX[pos - 1], GROUND);
+      foxTo(12, GROUND);
     } else {
       foxTo(50, GROUND);
+    }
+  }
+
+  function burstAt(x, y, color, count) {
+    for (var b = 0; b < count; b++) {
+      var d = document.createElement('div');
+      d.className = 'bub';
+      d.style.background = color;
+      d.style.left = (x + (Math.random() - 0.5) * 40) + 'px';
+      d.style.top = y + 'px';
+      d.style.setProperty('--dx', ((Math.random() - 0.5) * 90) + 'px');
+      d.style.setProperty('--dy', (-(70 + Math.random() * 90)) + 'px');
+      fxEl.appendChild(d);
+      d.addEventListener('animationend', function (ev) { ev.target.remove(); });
     }
   }
 
   function spawnBubbles(i, count) {
     var kr = keyEls[i].getBoundingClientRect();
     var ar = app.getBoundingClientRect();
-    var x = kr.left - ar.left + kr.width / 2;
-    var y = kr.top - ar.top + 8;
-    for (var b = 0; b < count; b++) {
-      var d = document.createElement('div');
-      d.className = 'bub';
-      d.style.background = NOTES[i].color;
-      d.style.left = (x + (Math.random() - 0.5) * kr.width * 0.6) + 'px';
-      d.style.top = y + 'px';
-      d.style.setProperty('--dx', ((Math.random() - 0.5) * 80) + 'px');
-      d.style.setProperty('--dy', (-(90 + Math.random() * 90)) + 'px');
-      fxEl.appendChild(d);
-      d.addEventListener('animationend', function (ev) { ev.target.remove(); });
-    }
+    burstAt(kr.left - ar.left + kr.width / 2, kr.top - ar.top + 8, NOTES[i].color, count);
   }
 
   function confetti() {
@@ -761,43 +843,119 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     later(function () { rainbowEl.classList.remove('show'); }, 3600);
   }
 
-  /* ---------- Histoires ---------- */
+  /* ---------- Histoires : le renard court, les notes arrivent de la droite ---------- */
+  function starText(n) {
+    var s = '';
+    for (var i = 0; i < 3; i++) s += i < n ? '★' : '☆';
+    return s;
+  }
+
   function storyCaption() {
     var st = STORIES[storyIdx];
-    var text = storyDone ? st.end : st.chapters[0].text;
-    if (!storyDone) st.chapters.forEach(function (c) { if (c.at <= pos) text = c.text; });
+    if (run.state === 'ready') {
+      var n = NOTES[st.melody[0]];
+      return 'Joue la touche ' + n.word + ' (' + n.name + ') pour partir !';
+    }
+    var text = st.chapters[0].text;
+    st.chapters.forEach(function (c) { if (c.at <= run.passed) text = c.text; });
+    if (run.state === 'done') text = st.end + ' ' + starText(run.finalStars);
     return text.replace(/\{nom\}/g, foxName);
   }
 
-  function updateStory() {
-    var st = STORIES[storyIdx];
-    var p = pos / st.melody.length;
-    stoneEls.forEach(function (d, k) {
-      d.classList.toggle('done', k < pos);
-      d.classList.toggle('next', k === pos && !storyDone);
-    });
+  function updateSky(p) {
     stage.style.setProperty('--rise', String(p));
     var ns = Math.round(starList.length * p);
-    starList.forEach(function (s, k) { s.classList.toggle('on', k < ns); });
     var nf = Math.round(flagList.length * p);
+    var key = ns * 100 + nf;
+    if (key === run.lastNs) return;
+    run.lastNs = key;
+    starList.forEach(function (s, k) { s.classList.toggle('on', k < ns); });
     flagList.forEach(function (f, k) { f.classList.toggle('on', k < nf); });
   }
 
-  function saveStar(id) {
-    stars[id] = (stars[id] || 0) + 1;
-    try { window.localStorage.setItem('renard-etoiles', JSON.stringify(stars)); } catch (e) { /* ignoré */ }
+  function layoutStory() {
+    var st = STORIES[storyIdx];
+    var sw = stage.clientWidth;
+    hitX = Math.round(0.12 * sw + foxEl.offsetWidth / 2);
+    pxBeat = Math.max(110, Math.min(190, sw / 6));
+    var tl = buildTimeline(st.beats);
+    run.blocks.forEach(function (b, k) {
+      b.style.left = Math.round(tl.start[k] * pxBeat) + 'px';
+      b.style.width = Math.max(40, Math.round(st.beats[k] * pxBeat - 12)) + 'px';
+    });
+    hitEl.style.left = hitX + 'px';
+    var beats = run.state === 'run' ? (performance.now() - run.t0) / run.beatMs : 0;
+    trackEl.style.transform = 'translateX(' + (hitX - beats * pxBeat) + 'px)';
+  }
+
+  function stopRun() {
+    cancelAnimationFrame(run.raf);
+    run.state = 'ready';
+    foxEl.classList.remove('run');
+  }
+
+  function setNextTarget() {
+    var st = STORIES[storyIdx];
+    var next = -1;
+    for (var k = 0; k < st.melody.length; k++) { if (run.status[k] === 0) { next = k; break; } }
+    target = next >= 0 ? st.melody[next] : -1;
+    if (target !== run.lastTarget) {
+      run.lastTarget = target;
+      refreshTarget();
+    }
+  }
+
+  function setStory(idx) {
+    clearTimers();
+    stopRun();
+    storyIdx = idx;
+    var st = STORIES[idx];
+    var tl = buildTimeline(st.beats);
+    run.beatMs = 60000 / st.bpm;
+    run.totalMs = tl.total * run.beatMs;
+    run.due = tl.start.map(function (b) { return b * run.beatMs; });
+    run.status = st.melody.map(function () { return 0; });
+    run.hits = 0;
+    run.passed = 0;
+    run.lastNs = -1;
+    run.lastTarget = -2;
+    run.finalStars = 0;
+
+    trackEl.innerHTML = '';
+    run.blocks = st.melody.map(function (m) {
+      var b = document.createElement('div');
+      b.className = 'note';
+      b.style.background = NOTES[m].color;
+      b.style.color = NOTES[m].text;
+      b.style.bottom = (26 + m * 7) + '%';
+      b.textContent = NOTES[m].name;
+      trackEl.appendChild(b);
+      return b;
+    });
+
+    var used = {};
+    st.melody.forEach(function (m) { used[m] = true; });
+    keyEls.forEach(function (key, i) { key.classList.toggle('unused', !used[i]); });
+    stage.setAttribute('data-scene', st.scene);
+    hillsEl.style.backgroundPositionX = '0px';
+    groundEl.style.backgroundPositionX = '0px';
+    updateSky(0);
     refreshStoryBar();
+    placeFox();
+    layoutStory();
+    setNextTarget();
+    hintDefault();
   }
 
   function refreshStoryBar() {
     storyBar.innerHTML = '';
     STORIES.forEach(function (s, k) {
       var b = document.createElement('button');
+      var n = Math.min(3, Number(stars[s.id]) || 0);
       b.type = 'button';
       b.setAttribute('aria-pressed', k === storyIdx ? 'true' : 'false');
-      b.textContent = 'Niveau ' + (k + 1) + ' : ' + s.short + (stars[s.id] ? ' ★' : '');
+      b.textContent = 'Niveau ' + (k + 1) + ' : ' + s.short + (n ? ' ' + starText(n) : '');
       b.addEventListener('click', function () {
-        if (k === storyIdx && pos === 0) return;
         resetState();
         setStory(k);
         say(NOTES[target].name);
@@ -806,41 +964,76 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     });
   }
 
-  function setStory(idx) {
-    clearTimers();
-    storyIdx = idx;
-    pos = 0;
-    storyDone = false;
-    var st = STORIES[idx];
-    var n = st.melody.length;
-    stonesEl.innerHTML = '';
-    stoneEls = [];
-    stoneX = [];
-    for (var k = 0; k < n; k++) {
-      var x = 6 + k * (88 / (n - 1));
-      var d = document.createElement('div');
-      d.className = 'stone';
-      d.style.left = x + '%';
-      d.style.background = NOTES[st.melody[k]].color;
-      stonesEl.appendChild(d);
-      stoneEls.push(d);
-      stoneX.push(x);
-    }
-    var used = {};
-    st.melody.forEach(function (m) { used[m] = true; });
-    keyEls.forEach(function (key, i) { key.classList.toggle('unused', !used[i]); });
-    stage.setAttribute('data-scene', st.scene);
-    target = st.melody[0];
-    updateStory();
+  function registerHit(k) {
+    var st = STORIES[storyIdx];
+    run.status[k] = 1;
+    run.hits += 1;
+    run.blocks[k].classList.add('hit');
+    foxAnim('hop');
+    var sr = stage.getBoundingClientRect();
+    var ar = app.getBoundingClientRect();
+    burstAt(sr.left - ar.left + hitX, sr.top - ar.top + sr.height * 0.5, NOTES[st.melody[k]].color, 8);
+    setNextTarget();
+  }
+
+  function startRun(t) {
+    run.state = 'run';
+    run.t0 = t;
+    foxEl.classList.add('run');
+    hintDefault();
+    run.raf = requestAnimationFrame(storyTick);
+  }
+
+  function finishRun() {
+    var st = STORIES[storyIdx];
+    cancelAnimationFrame(run.raf);
+    run.state = 'done';
+    foxEl.classList.remove('run');
+    run.finalStars = scoreStars(run.hits, st.melody.length);
+    stars[st.id] = Math.max(Number(stars[st.id]) || 0, run.finalStars);
+    try { window.localStorage.setItem('renard-etoiles', JSON.stringify(stars)); } catch (e) { /* ignoré */ }
     refreshStoryBar();
-    placeFox();
+    updateSky(1);
+    target = -1;
     refreshTarget();
     hintDefault();
+    reward();
+    later(function () { setStory(storyIdx); say(NOTES[target].name); }, 7500);
+  }
+
+  function storyTick(now) {
+    if (run.state !== 'run') return;
+    var st = STORIES[storyIdx];
+    var el = now - run.t0;
+    var beats = el / run.beatMs;
+    trackEl.style.transform = 'translateX(' + (hitX - beats * pxBeat) + 'px)';
+    hillsEl.style.backgroundPositionX = (-beats * pxBeat * 0.25) + 'px';
+    groundEl.style.backgroundPositionX = (-beats * pxBeat) + 'px';
+
+    var passed = 0;
+    var changed = false;
+    for (var k = 0; k < st.melody.length; k++) {
+      if (run.due[k] <= el) passed += 1;
+      if (run.status[k] === 0 && el > run.due[k] + WINDOW_MS) {
+        run.status[k] = 2;
+        run.blocks[k].classList.add('missed');
+        changed = true;
+      }
+    }
+    if (changed) setNextTarget();
+    if (passed !== run.passed) {
+      run.passed = passed;
+      hintDefault();
+    }
+    updateSky(Math.min(1, el / run.totalMs));
+
+    if (el > run.totalMs + 800) { finishRun(); return; }
+    run.raf = requestAnimationFrame(storyTick);
   }
 
   /* ---------- Textes d'aide et cible ---------- */
   function refreshTarget() {
-    var guided = mode === 'escalier' || (mode === 'histoire' && !storyDone);
+    var guided = mode === 'escalier' || (mode === 'histoire' && run.state !== 'done');
     keyEls.forEach(function (k, i) { k.classList.toggle('target', guided && i === target); });
     stepEls.forEach(function (s, i) { s.classList.toggle('target', mode === 'escalier' && i === target); });
   }
@@ -897,31 +1090,21 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
       }
     } else if (mode === 'histoire') {
       var st = STORIES[storyIdx];
-      if (storyDone) {
+      var tNow = performance.now() - (silent ? MIC_LATENCY : 0);
+      if (run.state === 'done') {
         foxAnim('hop');
-      } else if (i === st.melody[pos]) {
-        pos += 1;
-        placeFox();
-        foxAnim('hop');
-        if (pos >= st.melody.length) {
-          storyDone = true;
-          target = -1;
-          updateStory();
-          refreshTarget();
-          hintDefault();
-          reward();
-          saveStar(st.id);
-          later(function () { setStory(storyIdx); say(NOTES[target].name); }, 7000);
+      } else if (run.state === 'ready') {
+        if (i === st.melody[0]) {
+          startRun(tNow);
+          registerHit(0);
         } else {
-          target = st.melody[pos];
-          updateStory();
-          refreshTarget();
-          hintDefault();
-          if (target !== i) say(NOTES[target].name);
+          foxAnim('wobble');
+          say(NOTES[st.melody[0]].name);
         }
       } else {
-        foxAnim('wobble');
-        say(NOTES[st.melody[pos]].name);
+        var k = findHit(run.status, st.melody, run.due, tNow - run.t0, i, WINDOW_MS);
+        if (k >= 0) registerHit(k);
+        else foxAnim('wobble');
       }
     }
   }
@@ -944,12 +1127,11 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
 
   function resetState() {
     clearTimers();
+    stopRun();
     releaseAll();
     micNote = -1;
     stepIdx = -1;
     target = 0;
-    pos = 0;
-    storyDone = false;
     foxEl.classList.remove('hop', 'wobble');
     rainbowEl.classList.remove('show');
   }
@@ -984,6 +1166,8 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     hintDefault();
   });
 
+  window.addEventListener('resize', function () { if (mode === 'histoire') layoutStory(); });
+
   /* ---------- Micro (piano acoustique, une note à la fois) ---------- */
   var micBtn = document.getElementById('mic');
   var micBox = document.getElementById('micbox');
@@ -991,11 +1175,14 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   var levelEl = document.getElementById('level');
   var sensEl = document.getElementById('sens');
   var micOn = false;
+  var micWanted = false;   // choix de l'utilisateur, mémorisé d'une visite à l'autre
+  var micStarting = false;
   var micStream = null;
   var micSource = null;
   var analyser = null;
   var micBuf = null;
   var micTimer = 0;
+  var wakeLock = null;
   var micNote = -1;        // note actuellement tenue au piano (-1 = aucune)
   var micCand = -1;
   var micCount = 0;
@@ -1006,6 +1193,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   try {
     var savedSens = window.localStorage.getItem('renard-sens');
     if (savedSens) sensEl.value = savedSens;
+    micWanted = window.localStorage.getItem('renard-micro') === 'oui';
   } catch (e) { /* ignoré */ }
   sensEl.addEventListener('input', function () {
     try { window.localStorage.setItem('renard-sens', sensEl.value); } catch (e) { /* ignoré */ }
@@ -1058,12 +1246,13 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   }
   /* DETECTION-END */
 
-  // Échelle recalée : le maximum (10) est plus sensible qu'avant, et c'est la valeur par défaut
+  // Échelle recalée : le maximum (10) est la valeur par défaut et la plus sensible
   function threshold() { return 0.0012 * Math.pow(1.5, 10 - Number(sensEl.value)); }
 
   function micTick() {
     if (!analyser) return;
     var now = performance.now();
+    if (ac && ac.state === 'suspended') { try { ac.resume(); } catch (e) { /* ignoré */ } }
     analyser.getFloatTimeDomainData(micBuf);
     var s = 0;
     for (var n = 0; n < micBuf.length; n++) s += micBuf[n] * micBuf[n];
@@ -1128,35 +1317,64 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
       micBtn.setAttribute('aria-pressed', 'false');
       return;
     }
-    micBtn.textContent = 'Micro : ' + (micOn ? 'oui' : 'non');
-    micBtn.setAttribute('aria-pressed', micOn ? 'true' : 'false');
+    if (micOn) micBtn.textContent = 'Micro : oui';
+    else micBtn.textContent = micWanted ? 'Micro : démarre au toucher' : 'Micro : non';
+    micBtn.setAttribute('aria-pressed', (micOn || micWanted) ? 'true' : 'false');
   }
   refreshMicBtn();
 
-  function micStop() {
+  function keepAwake(on) {
+    try {
+      if (on && navigator.wakeLock && !wakeLock) {
+        navigator.wakeLock.request('screen').then(function (l) { wakeLock = l; }).catch(function () { /* ignoré */ });
+      } else if (!on && wakeLock) {
+        wakeLock.release();
+        wakeLock = null;
+      }
+    } catch (e) { /* ignoré */ }
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') {
+      wakeLock = null;
+      if (micOn) keepAwake(true);
+    }
+  });
+
+  function rememberMic(on) {
+    micWanted = on;
+    try { window.localStorage.setItem('renard-micro', on ? 'oui' : 'non'); } catch (e) { /* ignoré */ }
+  }
+
+  // forget = true : l'utilisateur coupe le micro, on ne le relancera plus tout seul
+  function micStop(forget) {
     clearInterval(micTimer);
     micTimer = 0;
     if (micNote >= 0) release(micNote);
     micNote = -1;
-    if (micStream) micStream.getTracks().forEach(function (t) { t.stop(); });
+    if (micStream) micStream.getTracks().forEach(function (t) { t.onended = null; t.stop(); });
     try { if (micSource) micSource.disconnect(); } catch (e) { /* ignoré */ }
     micStream = null;
     micSource = null;
     analyser = null;
     micOn = false;
     micBox.hidden = true;
+    keepAwake(false);
+    if (forget) rememberMic(false);
     refreshMicBtn();
   }
 
-  function micStart() {
+  function micStart(auto) {
+    if (micStarting || micOn) return;
     var c = audio();
     if (!c || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setHint("Ce navigateur ne permet pas d'utiliser le micro.");
       return;
     }
+    micStarting = true;
     navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
     }).then(function (stream) {
+      micStarting = false;
       micStream = stream;
       micSource = c.createMediaStreamSource(stream);
       analyser = c.createAnalyser();
@@ -1164,20 +1382,32 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
       micBuf = new Float32Array(analyser.fftSize);
       micSource.connect(analyser);   // pas relié à la sortie : aucun écho
       micOn = true;
+      rememberMic(true);
       micBox.hidden = false;
+      keepAwake(true);
       refreshMicBtn();
       micTimer = setInterval(micTick, 40);
-      setHint('Le micro écoute. Joue une note sur ton piano.');
-    }).catch(function () {
+      // Si le système coupe le micro (veille, appel), on le relance au prochain toucher
+      stream.getAudioTracks().forEach(function (t) {
+        t.onended = function () { micStop(false); };
+      });
+      if (!auto) setHint('Le micro écoute. Joue une note sur ton piano.');
+    }).catch(function (err) {
+      micStarting = false;
       micOn = false;
+      var denied = err && (err.name === 'NotAllowedError' || err.name === 'SecurityError');
+      if (denied) rememberMic(false);   // refus : on ne redemande pas à chaque toucher
       refreshMicBtn();
-      setHint("Le micro est bloqué. Autorise-le dans les réglages du navigateur, puis réessaie.");
+      setHint(denied
+        ? "Le micro est bloqué. Autorise-le dans les réglages du navigateur, puis touche « Micro »."
+        : "Le micro n'a pas démarré. Touche « Micro » pour réessayer.");
     });
   }
 
   micBtn.addEventListener('click', function () {
-    if (micOn) micStop();
-    else micStart();
+    if (micOn) micStop(true);
+    else if (micWanted) { rememberMic(false); refreshMicBtn(); }
+    else micStart(false);
   });
 
   /* Clavier de l'ordinateur : A S D F G */

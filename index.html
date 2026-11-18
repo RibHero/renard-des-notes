@@ -209,7 +209,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
 
 /* Décor qui défile (jeu des histoires) */
 #hills, #groundline, #track, #hitline { display: none; position: absolute; pointer-events: none; }
-[data-mode="histoire"] #hills, [data-mode="histoire"] #groundline, [data-mode="histoire"] #track, [data-mode="histoire"] #hitline { display: block; }
+[data-lane="1"] #hills, [data-lane="1"] #groundline, [data-lane="1"] #track, [data-lane="1"] #hitline { display: block; }
 #hills {
   left: 0;
   right: 0;
@@ -255,7 +255,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
 .note.missed { opacity: 0.22; }
 
 #steps { position: absolute; inset: 0; pointer-events: none; transition: opacity 0.3s, transform 0.3s; }
-[data-mode="libre"] #steps, [data-mode="histoire"] #steps { opacity: 0; transform: translateY(14%); }
+[data-mode="libre"] #steps, [data-lane="1"] #steps { opacity: 0; transform: translateY(14%); }
 .step {
   position: absolute;
   bottom: 8%;
@@ -364,8 +364,25 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
 }
 
 @media (max-width: 560px) {
-  #app { padding: 10px 12px 14px; }
-  .namebox input { width: 7.5em; }
+  #app { padding: 8px 10px 12px; gap: 6px; }
+  header { gap: 6px 8px; }
+  h1 { font-size: 1.25rem; width: 100%; }
+  #modes button, #voice, #mic, #storybar button { font-size: 0.85rem; padding: 6px 11px; border-width: 2px; }
+  #storybar { gap: 5px; }
+  .namebox { font-size: 0.75rem; }
+  .namebox input { width: 6.5em; padding: 4px 8px; }
+  #hint { padding: 6px 14px; border-width: 2px; }
+  #stage { min-height: 200px; border-width: 2px; }
+  #keys { height: clamp(100px, 17vh, 150px); gap: 6px; }
+  .key { padding-bottom: 8px; box-shadow: 0 5px 0 var(--ink); }
+}
+@media (max-height: 460px) {
+  h1, .namebox { display: none; }
+  #app { gap: 4px; padding: 6px 10px 8px; }
+  #modes button, #voice, #mic, #storybar button { font-size: 0.78rem; padding: 3px 10px; border-width: 2px; }
+  #hint { font-size: 0.9rem; padding: 3px 12px; border-width: 2px; }
+  #keys { height: 70px; }
+  #stage { min-height: 110px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
@@ -501,9 +518,13 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
 
   // Niveaux de l'escalier : suites de notes (0 = do ... 4 = sol), de plus en plus longues
   var ESCALIERS = [
-    { short: 'Monter', seq: [0, 1, 2, 3, 4] },
-    { short: 'Aller-retour', seq: [0, 1, 2, 3, 4, 3, 2, 1, 0, 1, 2, 3, 4, 3, 2, 1, 0] },
-    { short: 'Sauts', seq: [0, 2, 1, 3, 2, 4, 3, 4, 2, 3, 1, 2, 0, 1, 0, 4, 0, 4, 1, 3, 0, 2, 4, 2, 0] }
+    { short: 'Monter (5 notes)', seq: [0, 1, 2, 3, 4] },
+    { id: 'esc1', short: 'Aller-retour (7 notes)', scene: 'day', bpm: 50, parcours: true,
+      melody: [0, 1, 2, 3, 4, 3, 2], beats: [1, 1, 1, 1, 1, 1, 1], end: 'Bravo ! {nom} est arrivé au bout !' },
+    { id: 'esc2', short: 'Sauts (8 notes)', scene: 'day', bpm: 50, parcours: true,
+      melody: [0, 2, 4, 2, 1, 3, 0, 4], beats: [1, 1, 1, 1, 1, 1, 1, 1], end: 'Bravo ! {nom} a sauté partout !' },
+    { id: 'esc3', short: 'Grand voyage (10 notes)', scene: 'day', bpm: 50, parcours: true,
+      melody: [0, 2, 1, 3, 2, 4, 3, 2, 1, 0], beats: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], end: 'Bravo ! {nom} a fait le grand voyage !' }
   ];
 
   /* RHYTHM-START */
@@ -555,6 +576,8 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   var timers = [];
   var storyIdx = 0;
   var escLevel = 0;
+  function curStory() { return mode === 'escalier' ? ESCALIERS[escLevel] : STORIES[storyIdx]; }
+  function isLane() { return mode === 'histoire' || (mode === 'escalier' && !!ESCALIERS[escLevel].melody); }
   var escPos = 0;
   var starList = [];
   var flagList = [];
@@ -652,6 +675,13 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   try {
     if (window.localStorage.getItem('renard-voix') === 'non') voiceOn = false;
   } catch (e) { /* pas de stockage : on continue */ }
+
+  // La voix donne la couleur puis le nom : l'enfant peut garder les yeux sur ses doigts
+  var lastWrongSay = 0;
+  function sayNote(i) {
+    if (i < 0 || i >= ACTIVE) return;
+    say(NOTES[i].word + ', ' + NOTES[i].name);
+  }
 
   function pickVoice() {
     if (!synth) return;
@@ -796,11 +826,11 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   }
 
   function placeFox() {
-    if (mode === 'escalier') {
+    if (isLane()) {
+      foxTo(12, GROUND);
+    } else if (mode === 'escalier') {
       if (stepIdx < 0) foxTo(8, GROUND);
       else foxTo(4 + (stepIdx + 0.5) * (92 / ACTIVE), GROUND + (stepIdx + 1) * STEP_H);
-    } else if (mode === 'histoire') {
-      foxTo(12, GROUND);
     } else {
       foxTo(50, GROUND);
     }
@@ -859,7 +889,19 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   }
 
   function storyCaption() {
-    var st = STORIES[storyIdx];
+    var st = curStory();
+    var tot = st.melody.length;
+    if (st.parcours) {
+      if (run.state === 'ready') {
+        var n0 = NOTES[st.melody[0]];
+        return 'Niveau ' + (escLevel + 1) + ' : ' + tot + ' notes à jouer. Première note : touche ' + n0.word + ' (' + n0.name + ').';
+      }
+      if (run.state === 'done') return st.end.replace(/\{nom\}/g, foxName) + ' ' + starText(run.finalStars);
+      var nx = nextPending(run.status);
+      if (nx < 0) return 'Bravo, dernière note jouée !';
+      var n1 = NOTES[st.melody[nx]];
+      return 'Note ' + (nx + 1) + ' sur ' + tot + ' : touche ' + n1.word + ' (' + n1.name + ').';
+    }
     if (run.state === 'ready') {
       var n = NOTES[st.melody[0]];
       return 'Joue la touche ' + n.word + ' (' + n.name + ') pour partir ! ' + foxName + ' attend.';
@@ -882,7 +924,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   }
 
   function layoutStory() {
-    var st = STORIES[storyIdx];
+    var st = curStory();
     var sw = stage.clientWidth;
     hitX = Math.round(0.12 * sw + foxEl.offsetWidth / 2);
     pxBeat = Math.max(110, Math.min(190, sw / 6));
@@ -903,7 +945,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   }
 
   function setNextTarget() {
-    var st = STORIES[storyIdx];
+    var st = curStory();
     var next = -1;
     for (var k = 0; k < st.melody.length; k++) { if (run.status[k] === 0) { next = k; break; } }
     target = next >= 0 ? st.melody[next] : -1;
@@ -914,10 +956,14 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   }
 
   function setStory(idx) {
+    storyIdx = idx;
+    buildLane();
+  }
+
+  function buildLane() {
     clearTimers();
     stopRun();
-    storyIdx = idx;
-    var st = STORIES[idx];
+    var st = curStory();
     var tl = buildTimeline(st.beats);
     run.beatMs = 60000 / st.bpm;
     run.totalMs = tl.total * run.beatMs;
@@ -925,6 +971,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     run.status = st.melody.map(function () { return 0; });
     run.hits = 0;
     run.wrong = 0;
+    run.doneAt = 0;
     run.clock = 0;
     run.passed = 0;
     run.lastNs = -1;
@@ -957,14 +1004,27 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     hintDefault();
   }
 
+  function syncLane() {
+    app.setAttribute('data-lane', isLane() ? '1' : '0');
+  }
+
   function setEscLevel(k) {
     clearTimers();
     escLevel = k;
+    rainbowEl.classList.remove('show');
+    foxEl.classList.remove('hop', 'wobble');
+    syncLane();
+    if (isLane()) {
+      buildLane();
+      return;
+    }
+    stopRun();
+    stage.setAttribute('data-scene', 'day');
+    stage.style.setProperty('--rise', '0');
+    keyEls.forEach(function (key) { key.classList.remove('unused'); });
     escPos = 0;
     stepIdx = -1;
     target = ESCALIERS[k].seq[0];
-    rainbowEl.classList.remove('show');
-    foxEl.classList.remove('hop', 'wobble');
     refreshStoryBar();
     placeFox();
     refreshTarget();
@@ -978,11 +1038,12 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
         var b = document.createElement('button');
         b.type = 'button';
         b.setAttribute('aria-pressed', k === escLevel ? 'true' : 'false');
-        b.textContent = 'Niveau ' + (k + 1) + ' : ' + s.short + (stars['esc' + k] ? ' \u2605' : '');
+        var en = s.id ? Math.min(3, Number(stars[s.id]) || 0) : (stars.esc0 ? 3 : 0);
+        b.textContent = 'Niveau ' + (k + 1) + ' : ' + s.short + (en ? ' ' + starText(en) : '');
         b.addEventListener('click', function () {
           resetState();
           setEscLevel(k);
-          say(NOTES[target].name);
+          sayNote(target);
         });
         storyBar.appendChild(b);
       });
@@ -997,14 +1058,14 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
       b.addEventListener('click', function () {
         resetState();
         setStory(k);
-        say(NOTES[target].name);
+        sayNote(target);
       });
       storyBar.appendChild(b);
     });
   }
 
   function registerHit(k) {
-    var st = STORIES[storyIdx];
+    var st = curStory();
     run.status[k] = 1;
     run.hits += 1;
     run.blocks[k].classList.add('hit');
@@ -1013,6 +1074,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     var ar = app.getBoundingClientRect();
     burstAt(sr.left - ar.left + hitX, sr.top - ar.top + sr.height * 0.5, NOTES[st.melody[k]].color, 8);
     setNextTarget();
+    if (target >= 0) sayNote(target);
   }
 
   function startRun(t) {
@@ -1025,7 +1087,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
   }
 
   function finishRun() {
-    var st = STORIES[storyIdx];
+    var st = curStory();
     cancelAnimationFrame(run.raf);
     run.state = 'done';
     foxEl.classList.remove('run');
@@ -1038,12 +1100,12 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     refreshTarget();
     hintDefault();
     reward();
-    later(function () { setStory(storyIdx); say(NOTES[target].name); }, 7500);
+    later(function () { buildLane(); sayNote(target); }, 7500);
   }
 
   function storyTick(now) {
     if (run.state !== 'run') return;
-    var st = STORIES[storyIdx];
+    var st = curStory();
     var before = run.clock;
     run.clock = advanceClock(run.clock, Math.min(100, now - run.last), run.status, run.due);
     run.last = now;
@@ -1062,24 +1124,28 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     }
     updateSky(Math.min(1, run.clock / run.totalMs));
 
-    if (nextPending(run.status) < 0 && run.clock >= run.totalMs) { finishRun(); return; }
+    if (nextPending(run.status) < 0) {
+      if (!run.doneAt) run.doneAt = now;
+      if (now - run.doneAt > 600) { finishRun(); return; }
+    }
     run.raf = requestAnimationFrame(storyTick);
   }
 
   /* ---------- Textes d'aide et cible ---------- */
   function refreshTarget() {
-    var guided = mode === 'escalier' || (mode === 'histoire' && run.state !== 'done');
+    var lane = isLane();
+    var guided = lane ? run.state !== 'done' : mode === 'escalier';
     keyEls.forEach(function (k, i) { k.classList.toggle('target', guided && i === target); });
-    stepEls.forEach(function (s, i) { s.classList.toggle('target', mode === 'escalier' && i === target); });
+    stepEls.forEach(function (s, i) { s.classList.toggle('target', mode === 'escalier' && !lane && i === target); });
   }
 
   function hintDefault() {
-    if (mode === 'escalier') {
+    if (isLane()) {
+      setHint(storyCaption());
+    } else if (mode === 'escalier') {
       var n = NOTES[target];
       var tot = ESCALIERS[escLevel].seq.length;
       setHint('Joue la touche ' + n.word + ' : ' + n.name + '.  (' + (escPos + 1) + ' sur ' + tot + ')');
-    } else if (mode === 'histoire') {
-      setHint(storyCaption());
     } else {
       setHint('Joue ce que tu veux. Chaque touche a sa couleur et son son.');
     }
@@ -1096,8 +1162,8 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
 
     if (mode === 'libre') {
       foxAnim('hop');
-      say(NOTES[i].name);
-    } else if (mode === 'escalier') {
+      sayNote(i);
+    } else if (mode === 'escalier' && !isLane()) {
       var seq = ESCALIERS[escLevel].seq;
       stepIdx = i;
       placeFox();
@@ -1113,19 +1179,19 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
           setHint('Bravo ! ' + foxName + ' a trouvé l\u2019arc-en-ciel !');
           refreshTarget();
           reward();
-          later(function () { setEscLevel(escLevel); say(NOTES[target].name); }, 4800);
+          later(function () { setEscLevel(escLevel); sayNote(target); }, 4800);
         } else {
           target = seq[escPos];
           refreshTarget();
           hintDefault();
-          say(NOTES[target].name);
+          sayNote(target);
         }
       } else {
         foxAnim('wobble');
-        say(NOTES[target].name);
+        sayNote(target);
       }
-    } else if (mode === 'histoire') {
-      var st = STORIES[storyIdx];
+    } else if (isLane()) {
+      var st = curStory();
       if (run.state === 'done') {
         foxAnim('hop');
       } else if (run.state === 'ready') {
@@ -1134,7 +1200,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
           registerHit(0);
         } else {
           foxAnim('wobble');
-          say(NOTES[st.melody[0]].name);
+          sayNote(st.melody[0]);
         }
       } else {
         var k = nextPending(run.status);
@@ -1144,6 +1210,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
         } else {
           run.wrong += 1;
           foxAnim('wobble');
+          if (performance.now() - lastWrongSay > 2500) { lastWrongSay = performance.now(); sayNote(target); }
         }
       }
     }
@@ -1183,16 +1250,18 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
       b.setAttribute('aria-pressed', b.getAttribute('data-mode') === m ? 'true' : 'false');
     });
     resetState();
+    syncLane();
     if (m === 'histoire') {
       setStory(storyIdx);
     } else {
       stage.setAttribute('data-scene', 'day');
       stage.style.setProperty('--rise', '0');
       keyEls.forEach(function (k) { k.classList.remove('unused'); });
-      if (m === 'escalier') setEscLevel(escLevel);
-      else { storyBar.innerHTML = ''; placeFox(); refreshTarget(); hintDefault(); }
+      if (m === 'escalier') {
+        setEscLevel(escLevel);
+      } else { storyBar.innerHTML = ''; placeFox(); refreshTarget(); hintDefault(); }
     }
-    if (m !== 'libre') say(NOTES[target].name);
+    if (m !== 'libre') sayNote(target);
   }
 
   document.querySelectorAll('#modes button').forEach(function (b) {
@@ -1205,7 +1274,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); out
     hintDefault();
   });
 
-  window.addEventListener('resize', function () { if (mode === 'histoire') layoutStory(); });
+  window.addEventListener('resize', function () { if (isLane()) layoutStory(); });
 
   /* ---------- Micro (piano acoustique, une note à la fois) ---------- */
   var micBtn = document.getElementById('mic');

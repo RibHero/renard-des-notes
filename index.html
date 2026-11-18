@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Renard des notes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@600;800&display=swap" rel="stylesheet">
+<style>
+/* Plan : un ciel de papier découpé, un renard et cinq grosses touches colorées. Layout : en-tête, bulle d'aide, scène, clavier. */
+:root {
+  --sky-top: #bfe3ff;
+  --sky-bottom: #eaf7ff;
+  --ground: #8ed081;
+  --ink: #1e2a44;
+  --paper: #ffffff;
+  --fox: #d2601f;
+  --cream: #fff6e8;
+  --c-do: #d93a40;
+  --c-re: #f28a30;
+  --c-mi: #f6c324;
+  --c-fa: #3db46d;
+  --c-sol: #3569d6;
+  --display: 'Fredoka', 'Trebuchet MS', system-ui, sans-serif;
+  --body: 'Nunito', 'Segoe UI', system-ui, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--sky-bottom);
+  color: var(--ink);
+  font-family: var(--body);
+  font-weight: 600;
+  -webkit-tap-highlight-color: transparent;
+}
+#app {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px 16px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: clamp(1.4rem, 3.2vw, 2rem);
+  text-wrap: balance;
+}
+#modes { display: flex; gap: 6px; flex-wrap: wrap; }
+#modes button, #voice {
+  font: inherit;
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 1rem;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 3px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+#modes button[aria-pressed="true"], #voice[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+#voice:disabled { opacity: 0.5; cursor: default; }
+.namebox { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+.namebox input {
+  font: inherit;
+  width: 9.5em;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+}
+button:focus-visible, input:focus-visible { outline: 4px solid var(--c-sol); outline-offset: 3px; }
+
+#hint {
+  align-self: center;
+  max-width: 100%;
+  margin: 0;
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: clamp(1rem, 2.4vw, 1.35rem);
+  text-align: center;
+  text-wrap: balance;
+}
+
+#stage {
+  position: relative;
+  flex: 1;
+  min-height: 260px;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 3px solid var(--ink);
+  background:
+    linear-gradient(to top, var(--ground) 0 8%, transparent 8%),
+    linear-gradient(to bottom, var(--sky-top), var(--sky-bottom));
+}
+.cloud {
+  position: absolute;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--paper);
+  opacity: 0.9;
+}
+.cloud::after {
+  content: '';
+  position: absolute;
+  left: 18%;
+  top: -16px;
+  width: 44%;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--paper);
+}
+
+#steps { position: absolute; inset: 0; pointer-events: none; transition: opacity 0.3s, transform 0.3s; }
+[data-mode="libre"] #steps, [data-mode="tenir"] #steps { opacity: 0; transform: translateY(14%); }
+.step {
+  position: absolute;
+  bottom: 8%;
+  width: 18.4%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 8px;
+  border: 3px solid var(--ink);
+  border-bottom: 0;
+  border-radius: 16px 16px 0 0;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: clamp(0.9rem, 2.2vw, 1.4rem);
+}
+.step.target { animation: glow 0.9s ease-in-out infinite alternate; }
+@keyframes glow { from { box-shadow: 0 0 0 0 rgba(30, 42, 68, 0.0); } to { box-shadow: 0 0 0 8px rgba(30, 42, 68, 0.28); } }
+
+#fox {
+  position: absolute;
+  width: clamp(76px, min(14vw, 22vh), 130px);
+  aspect-ratio: 120 / 130;
+  transform: translateX(-50%);
+  transition: left 0.45s cubic-bezier(0.3, 1.5, 0.5, 1), bottom 0.45s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+#fox svg { width: 100%; height: 100%; display: block; overflow: visible; transform-origin: 50% 100%; }
+#fox .mouth-open { display: none; }
+#fox.singing .mouth-open { display: block; }
+#fox.singing .mouth-closed { display: none; }
+#fox.singing svg { animation: sway 0.6s ease-in-out infinite alternate; }
+#fox.hop svg { animation: hop 0.45s ease-out; }
+#fox.wobble svg { animation: wobble 0.5s ease-in-out; }
+@keyframes hop {
+  0% { transform: scale(1, 1); }
+  30% { transform: scale(1.1, 0.86); }
+  60% { transform: translateY(-14px) scale(0.95, 1.08); }
+  100% { transform: scale(1, 1); }
+}
+@keyframes wobble {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-7deg); }
+  75% { transform: rotate(7deg); }
+}
+@keyframes sway { from { transform: rotate(-3deg); } to { transform: rotate(3deg); } }
+
+#hold {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  width: min(520px, 80%);
+  transform: translateX(-50%);
+  display: none;
+  text-align: center;
+}
+[data-mode="tenir"] #hold { display: block; }
+#hold .track {
+  height: 26px;
+  border-radius: 999px;
+  border: 3px solid var(--ink);
+  background: var(--paper);
+  overflow: hidden;
+}
+#fill { height: 100%; width: 0; background: var(--c-do); transition: width 0.08s linear; }
+#fill.drain { transition: width 0.45s ease-out; }
+#count {
+  margin-top: 8px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+#rainbow {
+  position: absolute;
+  top: 4%;
+  left: 50%;
+  width: min(560px, 92%);
+  transform: translateX(-50%);
+  pointer-events: none;
+  opacity: 0;
+}
+#rainbow.show { opacity: 1; }
+#rainbow path { fill: none; stroke-width: 18; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+#rainbow.show path { animation: draw 1.4s ease-out forwards; }
+#rainbow.show path:nth-child(2) { animation-delay: 0.12s; }
+#rainbow.show path:nth-child(3) { animation-delay: 0.24s; }
+#rainbow.show path:nth-child(4) { animation-delay: 0.36s; }
+#rainbow.show path:nth-child(5) { animation-delay: 0.48s; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+
+#keys {
+  display: flex;
+  gap: 8px;
+  height: clamp(150px, 28vh, 240px);
+}
+.key {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 0 14px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: clamp(1.6rem, 5vw, 2.6rem);
+  border: 3px solid var(--ink);
+  border-radius: 18px 18px 26px 26px;
+  box-shadow: 0 8px 0 var(--ink);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 0.06s, box-shadow 0.06s;
+}
+.key.down { transform: translateY(7px); box-shadow: 0 1px 0 var(--ink); }
+.key.target { animation: keyglow 0.9s ease-in-out infinite alternate; }
+@keyframes keyglow { from { outline: 0 solid rgba(30, 42, 68, 0); } to { outline: 8px solid rgba(30, 42, 68, 0.3); } }
+
+#fx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.bub {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  animation: rise 0.95s ease-out forwards;
+}
+@keyframes rise {
+  from { transform: translate(0, 0) scale(0.6); opacity: 1; }
+  to { transform: translate(var(--dx), var(--dy)) scale(1.2); opacity: 0; }
+}
+
+@media (max-width: 560px) {
+  #app { padding: 10px 12px 14px; }
+  .namebox input { width: 7.5em; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+</style>
+</head>
+<body>
+<div id="app" data-mode="escalier">
+  <header>
+    <h1>Renard des notes</h1>
+    <div id="modes" role="group" aria-label="Choisir un jeu">
+      <button type="button" data-mode="escalier" aria-pressed="true">Escalier</button>
+      <button type="button" data-mode="tenir" aria-pressed="false">Tiens la note</button>
+      <button type="button" data-mode="libre" aria-pressed="false">Jeu libre</button>
+    </div>
+    <button type="button" id="voice" aria-pressed="true">Voix : oui</button>
+    <label class="namebox" for="fox-name">Nom du renard
+      <input id="fox-name" type="text" maxlength="14" value="Renard" autocomplete="off">
+    </label>
+  </header>
+
+  <p id="hint" role="status" aria-live="polite"></p>
+
+  <main id="stage">
+    <div class="cloud" style="left:6%; top:10%; width:110px"></div>
+    <div class="cloud" style="left:70%; top:22%; width:140px"></div>
+    <div id="steps"></div>
+    <div id="hold" aria-hidden="true">
+      <div class="track"><div id="fill"></div></div>
+      <div id="count">0 / 8 s</div>
+    </div>
+    <svg id="rainbow" viewBox="0 0 400 220" aria-hidden="true"></svg>
+    <div id="fox" aria-hidden="true">
+      <svg viewBox="0 0 120 130">
+        <path d="M92 100 C124 96 128 54 108 38 C112 64 100 78 82 84 Z" fill="#d2601f" stroke="#1e2a44" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M108 38 C100 46 102 58 108 66 C117 57 117 46 108 38 Z" fill="#fff6e8" stroke="#1e2a44" stroke-width="3" stroke-linejoin="round"/>
+        <ellipse cx="60" cy="100" rx="30" ry="26" fill="#d2601f" stroke="#1e2a44" stroke-width="3"/>
+        <ellipse cx="60" cy="106" rx="16" ry="16" fill="#fff6e8"/>
+        <ellipse cx="42" cy="124" rx="12" ry="6" fill="#7a2e10" stroke="#1e2a44" stroke-width="3"/>
+        <ellipse cx="78" cy="124" rx="12" ry="6" fill="#7a2e10" stroke="#1e2a44" stroke-width="3"/>
+        <path d="M22 46 L30 6 L54 28 Z" fill="#d2601f" stroke="#1e2a44" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M98 46 L90 6 L66 28 Z" fill="#d2601f" stroke="#1e2a44" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M31 34 L33 17 L45 28 Z" fill="#7a2e10"/>
+        <path d="M89 34 L87 17 L75 28 Z" fill="#7a2e10"/>
+        <path d="M20 54 C20 32 40 24 60 24 C80 24 100 32 100 54 C100 72 82 84 60 84 C38 84 20 72 20 54 Z" fill="#d2601f" stroke="#1e2a44" stroke-width="3"/>
+        <path d="M34 60 C44 56 52 64 60 72 C68 64 76 56 86 60 C84 76 72 84 60 84 C48 84 36 76 34 60 Z" fill="#fff6e8"/>
+        <circle cx="44" cy="52" r="5.5" fill="#1e2a44"/>
+        <circle cx="76" cy="52" r="5.5" fill="#1e2a44"/>
+        <circle cx="46" cy="50" r="1.8" fill="#fff"/>
+        <circle cx="78" cy="50" r="1.8" fill="#fff"/>
+        <ellipse cx="60" cy="68" rx="5" ry="4" fill="#1e2a44"/>
+        <path class="mouth-closed" d="M52 74 Q60 80 68 74" stroke="#1e2a44" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <ellipse class="mouth-open" cx="60" cy="77" rx="7" ry="6.5" fill="#7a2e10" stroke="#1e2a44" stroke-width="2.5"/>
+      </svg>
+    </div>
+  </main>
+
+  <section id="keys" aria-label="Clavier"></section>
+  <div id="fx" aria-hidden="true"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // Les 7 notes existent déjà ; la v1 en affiche 5 (ACTIVE). Le mode chanson viendra avec un fichier de notes.
+  var NOTES = [
+    { name: 'do',  freq: 261.63, color: '#d93a40', text: '#ffffff', word: 'rouge',  key: 'a' },
+    { name: 'ré',  freq: 293.66, color: '#f28a30', text: '#1e2a44', word: 'orange', key: 's' },
+    { name: 'mi',  freq: 329.63, color: '#f6c324', text: '#1e2a44', word: 'jaune',  key: 'd' },
+    { name: 'fa',  freq: 349.23, color: '#3db46d', text: '#1e2a44', word: 'verte',  key: 'f' },
+    { name: 'sol', freq: 392.00, color: '#3569d6', text: '#ffffff', word: 'bleue',  key: 'g' },
+    { name: 'la',  freq: 440.00, color: '#8e5bd6', text: '#ffffff', word: 'violette', key: 'h' },
+    { name: 'si',  freq: 493.88, color: '#e0559c', text: '#ffffff', word: 'rose',   key: 'j' }
+  ];
+  var ACTIVE = 5;
+  var HOLD_MS = 8000;
+  var STEP_H = 11;   // hauteur d'une marche, en % de la scène
+  var GROUND = 8;    // épaisseur du sol, en % de la scène
+
+  var app = document.getElementById('app');
+  var stage = document.getElementById('stage');
+  var stepsEl = document.getElementById('steps');
+  var keysEl = document.getElementById('keys');
+  var fxEl = document.getElementById('fx');
+  var foxEl = document.getElementById('fox');
+  var hintEl = document.getElementById('hint');
+  var fillEl = document.getElementById('fill');
+  var countEl = document.getElementById('count');
+  var rainbowEl = document.getElementById('rainbow');
+  var nameInput = document.getElementById('fox-name');
+
+  var mode = 'escalier';
+  var foxName = 'Renard';
+  var stepIdx = -1;
+  var target = 0;
+  var pressed = {};          // index -> { voice, t }
+  var activeHold = null;     // index de la touche tenue
+  var holdStart = 0;
+  var holdDone = false;
+  var rafId = 0;
+  var timers = [];
+
+  try {
+    var saved = window.localStorage.getItem('renard-nom');
+    if (saved) { foxName = saved; nameInput.value = saved; }
+  } catch (e) { /* pas de stockage : on continue */ }
+
+  /* ---------- Son ---------- */
+  var ac = null;
+  function audio() {
+    try {
+      if (!ac) {
+        var C = window.AudioContext || window.webkitAudioContext;
+        ac = new C();
+      }
+      if (ac.state === 'suspended') ac.resume();
+    } catch (e) { ac = null; }
+    return ac;
+  }
+
+  function startTone(freq) {
+    var c = audio();
+    if (!c) return null;
+    var t = c.currentTime;
+    var g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.2, t + 0.03);
+    var o1 = c.createOscillator();
+    o1.type = 'triangle';
+    o1.frequency.value = freq;
+    var o2 = c.createOscillator();
+    o2.type = 'sine';
+    o2.frequency.value = freq * 2;
+    var g2 = c.createGain();
+    g2.gain.value = 0.3;
+    var lfo = c.createOscillator();
+    lfo.frequency.value = 5.2;
+    var lg = c.createGain();
+    lg.gain.value = freq * 0.004;
+    lfo.connect(lg);
+    lg.connect(o1.frequency);
+    lg.connect(o2.frequency);
+    o1.connect(g);
+    o2.connect(g2);
+    g2.connect(g);
+    g.connect(c.destination);
+    o1.start(t); o2.start(t); lfo.start(t);
+    return {
+      stop: function (delay) {
+        var s = c.currentTime + (delay || 0);
+        g.gain.setTargetAtTime(0.0001, s, 0.09);
+        [o1, o2, lfo].forEach(function (o) { try { o.stop(s + 0.6); } catch (e) { /* déjà arrêté */ } });
+      }
+    };
+  }
+
+  function jingle() {
+    var c = audio();
+    if (!c) return;
+    var freqs = [523.25, 659.25, 783.99, 1046.5];
+    freqs.forEach(function (f, i) {
+      var t = c.currentTime + i * 0.13;
+      var o = c.createOscillator();
+      var g = c.createGain();
+      o.type = 'triangle';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.18, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+      o.connect(g);
+      g.connect(c.destination);
+      o.start(t);
+      o.stop(t + 0.4);
+    });
+  }
+
+  /* ---------- Voix ---------- */
+  var synth = ('speechSynthesis' in window) ? window.speechSynthesis : null;
+  var voiceBtn = document.getElementById('voice');
+  var voiceOn = true;
+  var userActed = false;   // les navigateurs refusent de parler avant le premier geste
+  var quiet = false;
+  var frVoice = null;
+
+  try {
+    if (window.localStorage.getItem('renard-voix') === 'non') voiceOn = false;
+  } catch (e) { /* pas de stockage : on continue */ }
+
+  function pickVoice() {
+    if (!synth) return;
+    var vs = synth.getVoices() || [];
+    frVoice = vs.filter(function (v) { return /^fr/i.test(v.lang); })[0] || null;
+  }
+  if (synth) {
+    pickVoice();
+    if (synth.addEventListener) synth.addEventListener('voiceschanged', pickVoice);
+  }
+
+  function say(text) {
+    if (!synth || !voiceOn || !userActed || !text) return;
+    try {
+      synth.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = 'fr-FR';
+      if (frVoice) u.voice = frVoice;
+      u.rate = 0.9;
+      u.pitch = 1.1;
+      synth.speak(u);
+    } catch (e) { /* voix indisponible : le jeu continue sans */ }
+  }
+
+  function refreshVoiceBtn() {
+    if (!synth) {
+      voiceBtn.textContent = 'Voix indisponible';
+      voiceBtn.disabled = true;
+      voiceBtn.setAttribute('aria-pressed', 'false');
+      return;
+    }
+    voiceBtn.textContent = 'Voix : ' + (voiceOn ? 'oui' : 'non');
+    voiceBtn.setAttribute('aria-pressed', voiceOn ? 'true' : 'false');
+  }
+  refreshVoiceBtn();
+
+  voiceBtn.addEventListener('click', function () {
+    voiceOn = !voiceOn;
+    try { window.localStorage.setItem('renard-voix', voiceOn ? 'oui' : 'non'); } catch (e) { /* ignoré */ }
+    refreshVoiceBtn();
+    if (voiceOn) {
+      userActed = true;
+      say(hintEl.textContent);
+    } else if (synth) {
+      try { synth.cancel(); } catch (e) { /* ignoré */ }
+    }
+  });
+
+  ['pointerdown', 'keydown'].forEach(function (ev) {
+    document.addEventListener(ev, function () { userActed = true; }, true);
+  });
+
+  /* ---------- Construction de l'interface ---------- */
+  var keyEls = [];
+  var stepEls = [];
+  NOTES.slice(0, ACTIVE).forEach(function (n, i) {
+    var k = document.createElement('button');
+    k.type = 'button';
+    k.className = 'key';
+    k.style.background = n.color;
+    k.style.color = n.text;
+    k.textContent = n.name;
+    k.setAttribute('aria-label', n.name + ', touche ' + n.word);
+    keysEl.appendChild(k);
+    keyEls.push(k);
+
+    var s = document.createElement('div');
+    s.className = 'step';
+    s.style.left = (4 + i * (92 / ACTIVE)) + '%';
+    s.style.height = ((i + 1) * STEP_H) + '%';
+    s.style.background = n.color;
+    s.style.color = n.text;
+    s.textContent = n.name;
+    stepsEl.appendChild(s);
+    stepEls.push(s);
+
+    k.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      try { k.setPointerCapture(e.pointerId); } catch (err) { /* ignoré */ }
+      press(i);
+    });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (ev) {
+      k.addEventListener(ev, function () { release(i); });
+    });
+    k.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  });
+
+  (function buildRainbow() {
+    var NS = 'http://www.w3.org/2000/svg';
+    for (var i = 0; i < ACTIVE; i++) {
+      var r = 190 - i * 22;
+      var p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', 'M' + (200 - r) + ' 210 A' + r + ' ' + r + ' 0 0 1 ' + (200 + r) + ' 210');
+      p.setAttribute('pathLength', '1');
+      p.setAttribute('stroke', NOTES[i].color);
+      rainbowEl.appendChild(p);
+    }
+  })();
+
+  /* ---------- Utilitaires ---------- */
+  function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+  function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+
+  function setHint(text) {
+    hintEl.textContent = text;
+    if (!quiet) say(text);
+  }
+
+  function foxTo(leftPct, bottomPct) {
+    foxEl.style.left = leftPct + '%';
+    foxEl.style.bottom = bottomPct + '%';
+  }
+
+  function foxAnim(cls) {
+    foxEl.classList.remove('hop', 'wobble');
+    void foxEl.offsetWidth;
+    foxEl.classList.add(cls);
+  }
+
+  function placeFox() {
+    if (mode === 'escalier') {
+      if (stepIdx < 0) foxTo(8, GROUND);
+      else foxTo(4 + (stepIdx + 0.5) * (92 / ACTIVE), GROUND + (stepIdx + 1) * STEP_H);
+    } else {
+      foxTo(50, GROUND);
+    }
+  }
+
+  function spawnBubbles(i, count) {
+    var kr = keyEls[i].getBoundingClientRect();
+    var ar = app.getBoundingClientRect();
+    var x = kr.left - ar.left + kr.width / 2;
+    var y = kr.top - ar.top + 8;
+    for (var b = 0; b < count; b++) {
+      var d = document.createElement('div');
+      d.className = 'bub';
+      d.style.background = NOTES[i].color;
+      d.style.left = (x + (Math.random() - 0.5) * kr.width * 0.6) + 'px';
+      d.style.top = y + 'px';
+      d.style.setProperty('--dx', ((Math.random() - 0.5) * 80) + 'px');
+      d.style.setProperty('--dy', (-(90 + Math.random() * 90)) + 'px');
+      fxEl.appendChild(d);
+      d.addEventListener('animationend', function (ev) { ev.target.remove(); });
+    }
+  }
+
+  function confetti() {
+    var ar = app.getBoundingClientRect();
+    for (var n = 0; n < 28; n++) {
+      var d = document.createElement('div');
+      d.className = 'bub';
+      d.style.background = NOTES[n % ACTIVE].color;
+      d.style.left = (ar.width * (0.15 + Math.random() * 0.7)) + 'px';
+      d.style.top = (ar.height * 0.45) + 'px';
+      d.style.setProperty('--dx', ((Math.random() - 0.5) * 360) + 'px');
+      d.style.setProperty('--dy', (-(120 + Math.random() * 220)) + 'px');
+      fxEl.appendChild(d);
+      d.addEventListener('animationend', function (ev) { ev.target.remove(); });
+    }
+  }
+
+  function reward() {
+    rainbowEl.classList.remove('show');
+    void rainbowEl.getBoundingClientRect();
+    rainbowEl.classList.add('show');
+    confetti();
+    jingle();
+    foxAnim('hop');
+    later(function () { rainbowEl.classList.remove('show'); }, 3600);
+  }
+
+  /* ---------- Textes d'aide et cible ---------- */
+  function refreshTarget() {
+    keyEls.forEach(function (k, i) { k.classList.toggle('target', mode === 'escalier' && i === target); });
+    stepEls.forEach(function (s, i) { s.classList.toggle('target', mode === 'escalier' && i === target); });
+  }
+
+  function hintDefault() {
+    if (mode === 'escalier') {
+      var n = NOTES[target];
+      setHint('Aide ' + foxName + ' à monter ! Joue la touche ' + n.word + ' : ' + n.name + '.');
+    } else if (mode === 'tenir') {
+      setHint('Appuie sur une touche et tiens-la 8 secondes pour faire chanter ' + foxName + '.');
+    } else {
+      setHint('Joue ce que tu veux. Chaque touche a sa couleur et son son.');
+    }
+  }
+
+  /* ---------- Jeu ---------- */
+  function press(i) {
+    if (pressed[i]) return;
+    var voice = startTone(NOTES[i].freq);
+    pressed[i] = { voice: voice, t: performance.now() };
+    keyEls[i].classList.add('down');
+    spawnBubbles(i, 6);
+
+    if (mode === 'libre') {
+      foxAnim('hop');
+      say(NOTES[i].name);
+    } else if (mode === 'escalier') {
+      stepIdx = i;
+      placeFox();
+      if (i === target) {
+        target += 1;
+        foxAnim('hop');
+        if (target >= ACTIVE) {
+          setHint('Bravo ! ' + foxName + ' est tout en haut !');
+          refreshTarget();
+          reward();
+          later(function () {
+            target = 0;
+            stepIdx = -1;
+            placeFox();
+            refreshTarget();
+            hintDefault();
+          }, 4200);
+        } else {
+          refreshTarget();
+          hintDefault();
+        }
+      } else {
+        foxAnim('wobble');
+        setHint('Presque ! Cherche la touche ' + NOTES[target].word + ' : ' + NOTES[target].name + '.');
+      }
+    } else if (mode === 'tenir') {
+      if (activeHold === null) startHold(i);
+      else foxAnim('hop');
+    }
+  }
+
+  function release(i) {
+    var p = pressed[i];
+    if (!p) return;
+    delete pressed[i];
+    keyEls[i].classList.remove('down');
+    if (p.voice) {
+      var elapsed = (performance.now() - p.t) / 1000;
+      p.voice.stop(Math.max(0, 0.35 - elapsed));
+    }
+    if (mode === 'tenir' && activeHold === i) endHold();
+  }
+
+  function releaseAll() {
+    Object.keys(pressed).forEach(function (k) { release(Number(k)); });
+  }
+
+  function setBar(p) {
+    fillEl.style.width = (p * 100) + '%';
+    countEl.textContent = Math.min(8, Math.floor(p * 8)) + ' / 8 s';
+  }
+
+  function startHold(i) {
+    activeHold = i;
+    holdStart = performance.now();
+    holdDone = false;
+    fillEl.classList.remove('drain');
+    fillEl.style.background = NOTES[i].color;
+    foxEl.classList.add('singing');
+    setHint(foxName + ' chante la note ' + NOTES[i].name + ' ! Continue de tenir.');
+    cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function tick(now) {
+    if (activeHold === null) return;
+    var p = Math.min(1, (now - holdStart) / HOLD_MS);
+    setBar(p);
+    if (p >= 1 && !holdDone) {
+      holdDone = true;
+      setHint('Bravo ! 8 secondes ! Tu peux relâcher.');
+      reward();
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function endHold() {
+    cancelAnimationFrame(rafId);
+    activeHold = null;
+    foxEl.classList.remove('singing');
+    if (holdDone) {
+      later(function () {
+        fillEl.classList.add('drain');
+        setBar(0);
+        hintDefault();
+      }, 1200);
+    } else {
+      fillEl.classList.add('drain');
+      setBar(0);
+      setHint('Encore ! Essaie de tenir un peu plus longtemps.');
+    }
+  }
+
+  function resetState() {
+    clearTimers();
+    cancelAnimationFrame(rafId);
+    releaseAll();
+    activeHold = null;
+    holdDone = false;
+    stepIdx = -1;
+    target = 0;
+    foxEl.classList.remove('singing', 'hop', 'wobble');
+    rainbowEl.classList.remove('show');
+    fillEl.classList.add('drain');
+    setBar(0);
+  }
+
+  function setMode(m) {
+    mode = m;
+    app.setAttribute('data-mode', m);
+    document.querySelectorAll('#modes button').forEach(function (b) {
+      b.setAttribute('aria-pressed', b.getAttribute('data-mode') === m ? 'true' : 'false');
+    });
+    resetState();
+    placeFox();
+    refreshTarget();
+    hintDefault();
+  }
+
+  document.querySelectorAll('#modes button').forEach(function (b) {
+    b.addEventListener('click', function () { setMode(b.getAttribute('data-mode')); });
+  });
+
+  nameInput.addEventListener('input', function () {
+    foxName = nameInput.value.trim() || 'Renard';
+    try { window.localStorage.setItem('renard-nom', foxName); } catch (e) { /* ignoré */ }
+    if (activeHold === null) {
+      quiet = true;
+      hintDefault();
+      quiet = false;
+    }
+  });
+
+  /* Clavier de l'ordinateur : A S D F G */
+  function keyIndex(e) {
+    var k = (e.key || '').toLowerCase();
+    for (var i = 0; i < ACTIVE; i++) if (NOTES[i].key === k) return i;
+    return -1;
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.repeat || e.target === nameInput || e.ctrlKey || e.metaKey || e.altKey) return;
+    var i = keyIndex(e);
+    if (i >= 0) press(i);
+  });
+  document.addEventListener('keyup', function (e) {
+    var i = keyIndex(e);
+    if (i >= 0) release(i);
+  });
+  window.addEventListener('blur', releaseAll);
+
+  setMode('escalier');
+})();
+</script>
+</body>
+</html>
